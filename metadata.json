@@ -1,0 +1,6 @@
+{
+  "name": "MotoStreet PH - Motorcycle Parts & Tuning Marketplace",
+  "description": "Premier online marketplace for underbone and scooter motorcycle parts, featuring PayMongo & GCash checkout, seller portal, live order tracking, and AI tuning mechanic.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
