@@ -9,7 +9,8 @@ import {
   X, 
   ChevronDown, 
   LogOut, 
-  LogIn 
+  LogIn,
+  Database
 } from 'lucide-react';
 import { BikeModel, NavTab, UserProfile } from '../types';
 import { POPULAR_BIKES } from '../data/mockProducts';
@@ -27,6 +28,7 @@ interface HeaderProps {
   onOpenVoiceflow?: () => void;
   onOpenGuides?: () => void;
   onOpenSiteMap?: () => void;
+  onOpenSync?: () => void;
   userProfile: UserProfile | null;
   onOpenAuth: () => void;
   onSignOut: () => void;
@@ -41,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
   setSelectedBike,
   searchQuery,
   setSearchQuery,
+  onOpenSync,
   userProfile,
   onOpenAuth,
   onSignOut,
@@ -267,6 +270,19 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <LogIn className="w-3.5 h-3.5 text-cyan-400" />
                 <span>Log In</span>
+              </button>
+            )}
+
+            {/* Supabase Cloud Sync Status Button */}
+            {onOpenSync && (
+              <button
+                onClick={onOpenSync}
+                className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-emerald-400 hover:border-emerald-500/40 text-xs font-semibold transition-all"
+                title="Supabase Database Status & SQL Fix Script"
+              >
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] font-bold font-mono">Cloud Sync</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               </button>
             )}
 

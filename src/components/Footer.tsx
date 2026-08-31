@@ -22,6 +22,7 @@ interface FooterProps {
   onOpenSiteMap: () => void;
   onOpenGuides: () => void;
   onOpenVoiceflow: () => void;
+  onOpenSync?: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
@@ -29,6 +30,7 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenSiteMap,
   onOpenGuides,
   onOpenVoiceflow,
+  onOpenSync,
 }) => {
   return (
     <footer className="bg-neutral-950 text-neutral-400 border-t border-neutral-850 font-['Plus_Jakarta_Sans']">
@@ -176,9 +178,13 @@ export const Footer: React.FC<FooterProps> = ({
               </button>
             </li>
             <li>
-              <button onClick={onOpenGuides} className="hover:text-white flex items-center gap-1.5 text-neutral-300">
+              <button 
+                onClick={onOpenSync || onOpenGuides} 
+                className="hover:text-emerald-400 flex items-center gap-1.5 text-neutral-300 transition-colors"
+                title="View Supabase Schema & SQL Setup Script"
+              >
                 <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Supabase PostgreSQL</span>
+                <span>Supabase PostgreSQL (Sync & SQL)</span>
               </button>
             </li>
             <li>

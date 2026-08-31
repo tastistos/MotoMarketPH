@@ -12,6 +12,7 @@ import { AboutContactPage } from './components/AboutContactPage';
 import { SiteMapModal } from './components/SiteMapModal';
 import { GuidesModal } from './components/GuidesModal';
 import { AuthModal } from './components/AuthModal';
+import { SupabaseSyncModal } from './components/SupabaseSyncModal';
 import { Footer } from './components/Footer';
 
 import { 
@@ -40,7 +41,8 @@ import {
   insertProductToDb,
   deleteProductFromDb,
   signOutUser,
-  upsertUserProfile
+  upsertUserProfile,
+  subscribeToDatabaseChanges
 } from './lib/supabase';
 
 export default function App() {
@@ -90,6 +92,7 @@ export default function App() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
   const [isSiteMapOpen, setIsSiteMapOpen] = useState<boolean>(false);
   const [isGuidesOpen, setIsGuidesOpen] = useState<boolean>(false);
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
   const [activeTrackingCode, setActiveTrackingCode] = useState<string>('');
 
   // Toast / Notification
@@ -160,6 +163,25 @@ export default function App() {
 
     loadCloudData();
 
+    // Realtime changes subscription from Supabase
+    const unsubscribeRealtime = subscribeToDatabaseChanges({
+      onProductChange: () => {
+        console.log('Reloading products from realtime broadcast...');
+        loadCloudData();
+      },
+      onReviewChange: () => {
+        console.log('Reloading reviews from realtime broadcast...');
+        loadCloudData();
+      },
+      onOrderChange: () => {
+        console.log('Reloading orders from realtime broadcast...');
+        loadCloudData();
+      },
+      onProfileChange: () => {
+        console.log('Reloading profiles from realtime broadcast...');
+      }
+    });
+
     // Auto sync when user focuses tab or switches back
     const handleFocus = () => {
       if (document.visibilityState === 'visible') {
@@ -173,6 +195,7 @@ export default function App() {
     const pollInterval = setInterval(loadCloudData, 5000);
 
     return () => {
+      unsubscribeRealtime();
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleFocus);
       clearInterval(pollInterval);
@@ -386,6 +409,7 @@ export default function App() {
         onOpenGuides={() => setIsGuidesOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
+        onOpenSync={() => setIsSyncModalOpen(true)}
         userProfile={userProfile}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
@@ -566,11 +590,26 @@ export default function App() {
         onClose={() => setIsGuidesOpen(false)}
       />
 
+      <SupabaseSyncModal
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        onRefreshData={async () => {
+          const dbProducts = await fetchProductsFromDb();
+          if (dbProducts && dbProducts.length > 0) setProducts(dbProducts);
+          const dbReviews = await fetchReviewsFromDb();
+          if (dbReviews && dbReviews.length > 0) setReviews(dbReviews);
+          const dbOrders = await fetchOrdersFromDb();
+          if (dbOrders && dbOrders.length > 0) setOrders(dbOrders);
+          showToast('Data refreshed from Supabase Cloud!');
+        }}
+      />
+
       {/* Global Footer */}
       <Footer
         onNavigate={(tab) => setCurrentTab(tab)}
         onOpenSiteMap={() => setIsSiteMapOpen(true)}
         onOpenGuides={() => setIsGuidesOpen(true)}
+        onOpenSync={() => setIsSyncModalOpen(true)}
         onOpenVoiceflow={() => {
           if (typeof window !== 'undefined' && (window as any).voiceflow?.chat) {
             (window as any).voiceflow.chat.open();

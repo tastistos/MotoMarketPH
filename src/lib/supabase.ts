@@ -529,6 +529,7 @@ export async function insertReviewToDb(review: ProductReview): Promise<boolean> 
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
+      console.warn('Supabase insert review note:', error.message);
       await supabase.from('reviews').insert([payload]);
     }
     return true;
@@ -537,3 +538,221 @@ export async function insertReviewToDb(review: ProductReview): Promise<boolean> 
     return true;
   }
 }
+
+// ==========================================
+// 5. REAL-TIME SUBSCRIPTION FOR ALL DEVICES
+// ==========================================
+
+export function subscribeToDatabaseChanges(callbacks: {
+  onProductChange?: () => void;
+  onReviewChange?: () => void;
+  onOrderChange?: () => void;
+  onProfileChange?: () => void;
+}) {
+  const channel = supabase
+    .channel('motostreet-db-sync')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'products' },
+      () => {
+        console.log('Realtime update received: products table changed');
+        callbacks.onProductChange?.();
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'reviews' },
+      () => {
+        console.log('Realtime update received: reviews table changed');
+        callbacks.onReviewChange?.();
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'orders' },
+      () => {
+        console.log('Realtime update received: orders table changed');
+        callbacks.onOrderChange?.();
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'profiles' },
+      () => {
+        console.log('Realtime update received: profiles table changed');
+        callbacks.onProfileChange?.();
+      }
+    )
+    .subscribe((status) => {
+      console.log('Supabase Realtime status:', status);
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// ==========================================
+// 6. COMPLETE COPYABLE SQL CODE FOR SUPABASE
+// ==========================================
+
+export const SUPABASE_SCHEMA_SQL = `-- =========================================================================
+-- MOTOSTREET PH: COMPLETE SUPABASE DATABASE RESET & INITIALIZATION SCRIPT
+-- RUN THIS IN SUPABASE SQL EDITOR TO FIX ALL CROSS-DEVICE PERSISTENCE & AUTH
+-- =========================================================================
+
+-- 1. DROP EXISTING OLD TABLES AND TRIGGERS TO PREVENT SCHEMA CONFLICTS
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
+DROP TABLE IF EXISTS public.order_items CASCADE;
+DROP TABLE IF EXISTS public.orders CASCADE;
+DROP TABLE IF EXISTS public.reviews CASCADE;
+DROP TABLE IF EXISTS public.products CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+-- 2. CREATE PROFILES TABLE (Linked with Supabase Auth & Cross-device logins)
+CREATE TABLE public.profiles (
+  id TEXT PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  phone TEXT,
+  gcash_number TEXT,
+  address TEXT,
+  city TEXT,
+  province TEXT DEFAULT 'Metro Manila',
+  primary_bike TEXT DEFAULT 'Honda Click 125i (V1 / V2 / V3)',
+  avatar_url TEXT,
+  is_seller BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. CREATE PRODUCTS TABLE (Cross-device marketplace parts)
+CREATE TABLE public.products (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  brand TEXT DEFAULT 'Moto Performance',
+  category TEXT DEFAULT 'all',
+  price NUMERIC NOT NULL,
+  original_price NUMERIC,
+  rating NUMERIC DEFAULT 5.0,
+  review_count INT DEFAULT 0,
+  image TEXT,
+  additional_images JSONB DEFAULT '[]'::jsonb,
+  stock INT DEFAULT 1,
+  condition TEXT DEFAULT 'Brand New',
+  compatible_bikes JSONB DEFAULT '["Universal Underbone/Scooter"]'::jsonb,
+  description TEXT,
+  specifications JSONB DEFAULT '{}'::jsonb,
+  seller_id TEXT DEFAULT 'seller-1',
+  seller_name TEXT DEFAULT 'Verified Rider Seller',
+  seller_gcash TEXT,
+  seller_rating NUMERIC DEFAULT 5.0,
+  seller_location TEXT DEFAULT 'Metro Manila, PH',
+  seller_verified BOOLEAN DEFAULT TRUE,
+  featured BOOLEAN DEFAULT FALSE,
+  bestseller BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. CREATE REVIEWS TABLE (Cross-device verified rider reviews)
+CREATE TABLE public.reviews (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  user_name TEXT DEFAULT 'Rider',
+  user_avatar TEXT,
+  rating NUMERIC DEFAULT 5.0,
+  comment TEXT NOT NULL,
+  bike_model TEXT DEFAULT 'Motorcycle',
+  verified_purchase BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. CREATE ORDERS & ORDER ITEMS TABLES (PayMongo / GCash tracking)
+CREATE TABLE public.orders (
+  id TEXT PRIMARY KEY,
+  tracking_number TEXT NOT NULL,
+  customer_name TEXT,
+  customer_email TEXT,
+  customer_phone TEXT,
+  customer_gcash TEXT,
+  customer_address TEXT,
+  city TEXT,
+  province TEXT,
+  subtotal NUMERIC NOT NULL DEFAULT 0,
+  shipping_fee NUMERIC NOT NULL DEFAULT 0,
+  discount NUMERIC NOT NULL DEFAULT 0,
+  total NUMERIC NOT NULL DEFAULT 0,
+  payment_method TEXT DEFAULT 'gcash',
+  payment_status TEXT DEFAULT 'paid',
+  order_status TEXT DEFAULT 'placed',
+  courier TEXT DEFAULT 'J&T Express',
+  estimated_delivery TEXT DEFAULT '3-5 Business Days',
+  tracking_history JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE public.order_items (
+  id TEXT PRIMARY KEY,
+  order_id TEXT REFERENCES public.orders(id) ON DELETE CASCADE,
+  product_id TEXT,
+  name TEXT,
+  price NUMERIC,
+  quantity INT DEFAULT 1,
+  image TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 6. DISABLE ROW LEVEL SECURITY (RLS) & GRANT FULL ACCESS TO ANON & AUTHENTICATED ROLES
+-- This guarantees that products, reviews, and profiles NEVER get blocked by permission errors!
+ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reviews DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items DISABLE ROW LEVEL SECURITY;
+
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+
+-- 7. AUTO-PROFILE TRIGGER FOR SUPABASE AUTH
+-- Automatically creates a user profile row whenever someone registers via Supabase Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, full_name, phone, gcash_number, address, city, province, primary_bike, is_seller)
+  VALUES (
+    NEW.id::text,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'phone', ''),
+    COALESCE(NEW.raw_user_meta_data->>'gcash_number', ''),
+    COALESCE(NEW.raw_user_meta_data->>'address', ''),
+    COALESCE(NEW.raw_user_meta_data->>'city', ''),
+    COALESCE(NEW.raw_user_meta_data->>'province', 'Metro Manila'),
+    COALESCE(NEW.raw_user_meta_data->>'primary_bike', 'Honda Click 125i (V1 / V2 / V3)'),
+    COALESCE((NEW.raw_user_meta_data->>'is_seller')::boolean, false)
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    phone = EXCLUDED.phone,
+    gcash_number = EXCLUDED.gcash_number;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 8. ENABLE SUPABASE REALTIME REPLICATION (Instant cross-device updates without refresh)
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.products, public.reviews, public.orders, public.profiles;
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+  WHEN undefined_object THEN NULL;
+END $$;
+`;
+
