@@ -168,40 +168,50 @@ export async function fetchProductsFromDb(): Promise<Product[]> {
 
 export async function insertProductToDb(product: Product): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
+    const payload: Record<string, any> = {
+      id: product.id,
+      name: product.name,
+      brand: product.brand,
+      category: product.category,
+      price: Number(product.price),
+      original_price: product.originalPrice ? Number(product.originalPrice) : null,
+      rating: Number(product.rating || 5.0),
+      review_count: Number(product.reviewCount || 0),
+      image: product.image,
+      additional_images: product.additionalImages || [],
+      stock: Number(product.stock ?? 1),
+      condition: product.condition,
+      compatible_bikes: Array.isArray(product.compatibleBikes) ? product.compatibleBikes : [product.compatibleBikes],
+      description: product.description || '',
+      specifications: product.specifications || {},
+      seller_id: product.seller?.id || 'seller-1',
+      seller_name: product.seller?.name || 'Verified Rider Seller',
+      seller_gcash: product.seller?.gcashNumber || '',
+      seller_rating: Number(product.seller?.rating || 5.0),
+      seller_location: product.seller?.location || 'Metro Manila, PH',
+      seller_verified: Boolean(product.seller?.verified ?? true),
+      featured: Boolean(product.featured),
+      bestseller: Boolean(product.bestseller),
+      created_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
       .from('products')
-      .insert([
-        {
-          id: product.id,
-          name: product.name,
-          brand: product.brand,
-          category: product.category,
-          price: product.price,
-          original_price: product.originalPrice,
-          rating: product.rating,
-          review_count: product.reviewCount,
-          image: product.image,
-          additional_images: product.additionalImages || [],
-          stock: product.stock,
-          condition: product.condition,
-          compatible_bikes: product.compatibleBikes,
-          description: product.description,
-          specifications: product.specifications,
-          seller_id: product.seller.id,
-          seller_name: product.seller.name,
-          seller_gcash: product.seller.gcashNumber,
-          seller_rating: product.seller.rating,
-          seller_location: product.seller.location,
-          seller_verified: product.seller.verified,
-          featured: product.featured || false,
-          bestseller: product.bestseller || false,
-          created_at: new Date().toISOString(),
-        }
-      ]);
+      .upsert(payload, { onConflict: 'id' })
+      .select();
 
     if (error) {
-      console.warn('insertProductToDb error:', error.message);
-      return { success: false, error: error.message };
+      console.warn('insertProductToDb upsert error:', error.message, error.details);
+      
+      // Fallback try simple insert without conflict option if table has no explicit unique key constraint
+      const { error: simpleInsertErr } = await supabase
+        .from('products')
+        .insert([payload]);
+
+      if (simpleInsertErr) {
+        console.warn('insertProductToDb fallback insert error:', simpleInsertErr.message);
+        return { success: false, error: simpleInsertErr.message };
+      }
     }
     return { success: true };
   } catch (err: any) {
@@ -300,36 +310,43 @@ export async function fetchOrdersFromDb(userEmail?: string): Promise<Order[]> {
 
 export async function insertOrderToDb(order: Order): Promise<{ success: boolean; error?: string }> {
   try {
+    const orderPayload = {
+      id: order.id,
+      tracking_number: order.trackingNumber,
+      customer_name: order.customer.name,
+      customer_email: order.customer.email,
+      customer_phone: order.customer.phone,
+      customer_gcash: order.customer.gcashNumber,
+      customer_address: order.customer.address,
+      city: order.customer.city,
+      province: order.customer.province,
+      subtotal: order.subtotal,
+      shipping_fee: order.shippingFee,
+      discount: order.discount,
+      total: order.total,
+      payment_method: order.paymentMethod,
+      payment_status: order.paymentStatus,
+      order_status: order.orderStatus,
+      courier: order.courier,
+      estimated_delivery: order.estimatedDelivery,
+      tracking_history: order.trackingHistory,
+      created_at: order.createdAt || new Date().toISOString(),
+    };
+
     const { error: orderError } = await supabase
       .from('orders')
-      .insert([
-        {
-          id: order.id,
-          tracking_number: order.trackingNumber,
-          customer_name: order.customer.name,
-          customer_email: order.customer.email,
-          customer_phone: order.customer.phone,
-          customer_gcash: order.customer.gcashNumber,
-          customer_address: order.customer.address,
-          city: order.customer.city,
-          province: order.customer.province,
-          subtotal: order.subtotal,
-          shipping_fee: order.shippingFee,
-          discount: order.discount,
-          total: order.total,
-          payment_method: order.paymentMethod,
-          payment_status: order.paymentStatus,
-          order_status: order.orderStatus,
-          courier: order.courier,
-          estimated_delivery: order.estimatedDelivery,
-          tracking_history: order.trackingHistory,
-          created_at: order.createdAt || new Date().toISOString(),
-        }
-      ]);
+      .upsert(orderPayload, { onConflict: 'id' });
 
     if (orderError) {
-      console.warn('insertOrderToDb main order error:', orderError.message);
-      return { success: false, error: orderError.message };
+      console.warn('insertOrderToDb main order upsert error, trying insert:', orderError.message);
+      const { error: simpleOrderErr } = await supabase
+        .from('orders')
+        .insert([orderPayload]);
+
+      if (simpleOrderErr) {
+        console.warn('insertOrderToDb main order error:', simpleOrderErr.message);
+        return { success: false, error: simpleOrderErr.message };
+      }
     }
 
     if (order.items && order.items.length > 0) {
@@ -391,22 +408,29 @@ export async function fetchReviewsFromDb(productId?: string): Promise<ProductRev
 
 export async function insertReviewToDb(review: ProductReview): Promise<boolean> {
   try {
+    const payload = {
+      id: review.id,
+      product_id: review.productId,
+      user_name: review.userName,
+      user_avatar: review.userAvatar,
+      rating: review.rating,
+      comment: review.comment,
+      bike_model: review.bikeModel,
+      verified_purchase: review.verifiedPurchase,
+      created_at: new Date().toISOString(),
+    };
+
     const { error } = await supabase
       .from('reviews')
-      .insert([
-        {
-          id: review.id,
-          product_id: review.productId,
-          user_name: review.userName,
-          user_avatar: review.userAvatar,
-          rating: review.rating,
-          comment: review.comment,
-          bike_model: review.bikeModel,
-          verified_purchase: review.verifiedPurchase,
-          created_at: new Date().toISOString(),
-        }
-      ]);
-    return !error;
+      .upsert(payload, { onConflict: 'id' });
+
+    if (error) {
+      const { error: simpleErr } = await supabase
+        .from('reviews')
+        .insert([payload]);
+      return !simpleErr;
+    }
+    return true;
   } catch (err) {
     console.warn('insertReviewToDb exception:', err);
     return false;

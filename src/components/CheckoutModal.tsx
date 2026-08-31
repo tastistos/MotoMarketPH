@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { 
   X, 
@@ -14,9 +14,11 @@ import {
   Bike,
   Lock,
   Copy,
-  Receipt
+  Receipt,
+  Sparkles,
+  UserCheck
 } from 'lucide-react';
-import { CartItem, Order, PaymentMethod } from '../types';
+import { CartItem, Order, PaymentMethod, UserProfile } from '../types';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -26,6 +28,9 @@ interface CheckoutModalProps {
   onOrderSuccess: (order: Order) => void;
   userGcash: string;
   setUserGcash: (gcash: string) => void;
+  userProfile?: UserProfile | null;
+  onUpdateUserProfile?: (updated: Partial<UserProfile>) => void;
+  onOpenAuth?: () => void;
 }
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
@@ -36,20 +41,60 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderSuccess,
   userGcash,
   setUserGcash,
+  userProfile,
+  onUpdateUserProfile,
+  onOpenAuth,
 }) => {
   if (!isOpen) return null;
 
   const [step, setStep] = useState<'details' | 'payment' | 'processing' | 'success'>('details');
   
-  // Customer details
-  const [customerName, setCustomerName] = useState('Juan Dela Cruz');
-  const [customerEmail, setCustomerEmail] = useState('juan.rider@gmail.com');
-  const [customerPhone, setCustomerPhone] = useState('0917-555-4321');
-  const [gcashNumber, setGcashNumber] = useState(userGcash || '0917-882-9310');
-  const [shippingAddress, setShippingAddress] = useState('Blk 12 Lot 4, Sampaguita St., Brgy. San Antonio');
-  const [city, setCity] = useState('Quezon City');
-  const [province, setProvince] = useState('Metro Manila');
+  // Customer details - initialized from userProfile or saved storage
+  const [customerName, setCustomerName] = useState(() => userProfile?.fullName || 'Juan Dela Cruz');
+  const [customerEmail, setCustomerEmail] = useState(() => userProfile?.email || 'juan.rider@gmail.com');
+  const [customerPhone, setCustomerPhone] = useState(() => userProfile?.phone || '0917-555-4321');
+  const [gcashNumber, setGcashNumber] = useState(() => userProfile?.gcashNumber || userGcash || '0917-882-9310');
+  const [shippingAddress, setShippingAddress] = useState(() => userProfile?.address || 'Blk 12 Lot 4, Sampaguita St., Brgy. San Antonio');
+  const [city, setCity] = useState(() => userProfile?.city || 'Quezon City');
+  const [province, setProvince] = useState(() => userProfile?.province || 'Metro Manila');
   const [courier, setCourier] = useState<'J&T Express' | 'Flash Express' | 'Lalamove Moto'>('J&T Express');
+
+  // Auto-sync information whenever userProfile or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (userProfile) {
+        if (userProfile.fullName) setCustomerName(userProfile.fullName);
+        if (userProfile.email) setCustomerEmail(userProfile.email);
+        if (userProfile.phone) setCustomerPhone(userProfile.phone);
+        if (userProfile.gcashNumber) {
+          setGcashNumber(userProfile.gcashNumber);
+          setUserGcash(userProfile.gcashNumber);
+        } else if (userGcash) {
+          setGcashNumber(userGcash);
+        }
+        if (userProfile.address) setShippingAddress(userProfile.address);
+        if (userProfile.city) setCity(userProfile.city);
+        if (userProfile.province) setProvince(userProfile.province);
+      } else {
+        const saved = localStorage.getItem('motostreet_user_profile');
+        if (saved) {
+          try {
+            const p = JSON.parse(saved);
+            if (p.fullName) setCustomerName(p.fullName);
+            if (p.email) setCustomerEmail(p.email);
+            if (p.phone) setCustomerPhone(p.phone);
+            if (p.gcashNumber) {
+              setGcashNumber(p.gcashNumber);
+              setUserGcash(p.gcashNumber);
+            }
+            if (p.address) setShippingAddress(p.address);
+            if (p.city) setCity(p.city);
+            if (p.province) setProvince(p.province);
+          } catch (e) {}
+        }
+      }
+    }
+  }, [isOpen, userProfile, userGcash, setUserGcash]);
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('gcash');
@@ -70,6 +115,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     e.preventDefault();
     if (!customerName || !customerPhone || !shippingAddress) return;
     if (gcashNumber) setUserGcash(gcashNumber);
+
+    // Save updated customer information to user profile automatically
+    if (onUpdateUserProfile) {
+      onUpdateUserProfile({
+        fullName: customerName,
+        email: customerEmail,
+        phone: customerPhone,
+        gcashNumber,
+        address: shippingAddress,
+        city,
+        province,
+      });
+    }
+
     setStep('payment');
   };
 
@@ -224,6 +283,42 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* STEP 1: Customer Details */}
           {step === 'details' && (
             <form onSubmit={handleProceedToPayment} className="space-y-4">
+
+              {/* Auto-fill Status Banner */}
+              {userProfile ? (
+                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/80 text-emerald-300 text-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      Delivery details auto-filled from your account (<strong>{userProfile.fullName}</strong>).
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-900/60 font-bold text-emerald-300 border border-emerald-700/50 shrink-0">
+                    Auto-Filled
+                  </span>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-neutral-900/80 border border-neutral-800 text-neutral-300 text-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-red-400 shrink-0" />
+                    <span className="text-[11px]">
+                      Have an account? Log in to auto-fill your delivery info instantly.
+                    </span>
+                  </div>
+                  {onOpenAuth && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenAuth();
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider transition-colors shrink-0"
+                    >
+                      Sign In
+                    </button>
+                  )}
+                </div>
+              )}
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>

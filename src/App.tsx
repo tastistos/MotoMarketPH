@@ -36,7 +36,10 @@ import {
   fetchReviewsFromDb,
   insertOrderToDb,
   insertReviewToDb,
-  signOutUser
+  insertProductToDb,
+  deleteProductFromDb,
+  signOutUser,
+  upsertUserProfile
 } from './lib/supabase';
 
 export default function App() {
@@ -239,14 +242,27 @@ export default function App() {
   };
 
   // Product CRUD
-  const handleAddProduct = (newProduct: Product) => {
+  const handleAddProduct = async (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
     showToast不易('Motorcycle part published to marketplace!');
+    try {
+      const res = await insertProductToDb(newProduct);
+      if (!res.success) {
+        console.warn('Database note on adding product:', res.error);
+      }
+    } catch (err) {
+      console.warn('handleAddProduct error:', err);
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
     showToast不易('Product removed from active listings.');
+    try {
+      await deleteProductFromDb(productId);
+    } catch (err) {
+      console.warn('handleDeleteProduct error:', err);
+    }
   };
 
   // Review Submission
@@ -413,6 +429,18 @@ export default function App() {
               userGcash={userGcash}
               setUserGcash={setUserGcash}
               onNavigateToStore={() => setCurrentTab('store')}
+              userProfile={userProfile}
+              onUpdateUserProfile={async (updated) => {
+                if (userProfile) {
+                  const updatedProfile = { ...userProfile, ...updated };
+                  setUserProfile(updatedProfile);
+                  try {
+                    await upsertUserProfile(updatedProfile);
+                  } catch (err) {
+                    console.warn('Profile sync error:', err);
+                  }
+                }
+              }}
             />
             {/* Real-time Order Tracking Engine */}
             <OrderTrackingView
@@ -460,6 +488,26 @@ export default function App() {
         onOrderSuccess={handleOrderSuccess}
         userGcash={userGcash}
         setUserGcash={setUserGcash}
+        userProfile={userProfile}
+        onUpdateUserProfile={(updated) => {
+          setUserProfile((prev) => {
+            const nextProfile: UserProfile = prev
+              ? { ...prev, ...updated }
+              : {
+                  id: `rider-${Date.now()}`,
+                  fullName: updated.fullName || 'Rider Member',
+                  primaryBike: 'Honda Click 125i',
+                  isSeller: false,
+                  ...updated,
+                };
+            localStorage.setItem('motostreet_user_profile', JSON.stringify(nextProfile));
+            if (nextProfile.id && !nextProfile.id.startsWith('rider-')) {
+              upsertUserProfile(nextProfile);
+            }
+            return nextProfile;
+          });
+        }}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       <AuthModal

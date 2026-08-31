@@ -14,7 +14,7 @@ import {
   ExternalLink,
   ChevronRight
 } from 'lucide-react';
-import { Order, BikeModel } from '../types';
+import { Order, BikeModel, UserProfile } from '../types';
 import { POPULAR_BIKES } from '../data/mockProducts';
 
 interface UserDashboardProps {
@@ -23,6 +23,8 @@ interface UserDashboardProps {
   userGcash: string;
   setUserGcash: (gcash: string) => void;
   onNavigateToStore: () => void;
+  userProfile?: UserProfile | null;
+  onUpdateUserProfile?: (updated: Partial<UserProfile>) => void;
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({
@@ -31,16 +33,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   userGcash,
   setUserGcash,
   onNavigateToStore,
+  userProfile,
+  onUpdateUserProfile,
 }) => {
-  const [userName, setUserName] = useState('Danilo Marquez');
-  const [userEmail, setUserEmail] = useState('danilo.rider@gmail.com');
-  const [userPhone, setUserPhone] = useState('0917-882-9310');
-  const [gcashNumber, setGcashNumber] = useState(userGcash || '0917-882-9310');
-  const [city, setCity] = useState('Quezon City, Metro Manila');
+  const [userName, setUserName] = useState(userProfile?.fullName || 'Danilo Marquez');
+  const [userEmail, setUserEmail] = useState(userProfile?.email || 'danilo.rider@gmail.com');
+  const [userPhone, setUserPhone] = useState(userProfile?.phone || '0917-882-9310');
+  const [gcashNumber, setGcashNumber] = useState(userProfile?.gcashNumber || userGcash || '0917-882-9310');
+  const [city, setCity] = useState(userProfile?.city || 'Quezon City, Metro Manila');
   
   // Rider Garage (Bikes owned by user)
   const [garageBikes, setGarageBikes] = useState<string[]>([
-    'Honda Click 125i (V2 Game Changer)',
+    userProfile?.primaryBike || 'Honda Click 125i (V2 Game Changer)',
     'Honda XRM 125 Motard (Carb Edition)'
   ]);
   const [newBikeToAdd, setNewBikeToAdd] = useState('Suzuki Raider R150 Fi');
@@ -49,6 +53,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
     setUserGcash(gcashNumber);
+    if (onUpdateUserProfile) {
+      onUpdateUserProfile({
+        fullName: userName,
+        phone: userPhone,
+        gcashNumber,
+        city,
+        primaryBike: garageBikes[0] || 'Honda Click 125i',
+      });
+    }
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 2000);
   };

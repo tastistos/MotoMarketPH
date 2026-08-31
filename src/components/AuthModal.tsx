@@ -39,6 +39,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [gcashNumber, setGcashNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('');
+  const [province, setProvince] = useState('Metro Manila');
   const [primaryBike, setPrimaryBike] = useState('Honda Click 125i (V1 / V2 / V3)');
   const [isSeller, setIsSeller] = useState(false);
 
@@ -77,6 +80,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           fullName: user.user_metadata?.full_name || email.split('@')[0],
           phone: user.user_metadata?.phone || '',
           gcashNumber: user.user_metadata?.gcash_number || '',
+          address: user.user_metadata?.address || '',
+          city: user.user_metadata?.city || '',
+          province: user.user_metadata?.province || 'Metro Manila',
           primaryBike: user.user_metadata?.primary_bike || 'Honda Click 125i (V1 / V2 / V3)',
           isSeller: Boolean(user.user_metadata?.is_seller),
           createdAt: user.created_at,
@@ -104,6 +110,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               full_name: fullName.trim() || email.split('@')[0],
               phone: phone.trim(),
               gcash_number: gcashNumber.trim() || phone.trim(),
+              address: address.trim(),
+              city: city.trim(),
+              province: province.trim() || 'Metro Manila',
               primary_bike: primaryBike,
               is_seller: isSeller,
             }
@@ -119,6 +128,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           fullName: fullName.trim() || 'Rider Member',
           phone: phone.trim(),
           gcashNumber: gcashNumber.trim() || phone.trim(),
+          address: address.trim(),
+          city: city.trim(),
+          province: province.trim() || 'Metro Manila',
           primaryBike,
           isSeller,
           createdAt: new Date().toISOString(),
@@ -279,6 +291,51 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     placeholder="0917-xxx-xxxx"
                     className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 transition-colors"
                   />
+                </div>
+              </div>
+
+              {/* Delivery / Shipping Address */}
+              <div className="space-y-3 p-3.5 rounded-xl bg-neutral-900/40 border border-neutral-800/80">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-neutral-200 uppercase tracking-wider">
+                    Default Shipping Address
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-medium">Auto-fills on Checkout</span>
+                </div>
+
+                <div>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="House/Unit #, Street, Barangay (e.g. Blk 12 Lot 4, Brgy. San Antonio)"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 transition-colors"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <input
+                    type="text"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City / Municipality"
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 transition-colors"
+                  />
+                  <select
+                    value={province}
+                    onChange={(e) => setProvince(e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-colors"
+                  >
+                    <option value="Metro Manila">Metro Manila (NCR)</option>
+                    <option value="Cavite">Cavite</option>
+                    <option value="Laguna">Laguna</option>
+                    <option value="Bulacan">Bulacan</option>
+                    <option value="Rizal">Rizal</option>
+                    <option value="Pampanga">Pampanga</option>
+                    <option value="Cebu">Cebu</option>
+                    <option value="Davao">Davao</option>
+                    <option value="Other Provinces">Other Provinces</option>
+                  </select>
                 </div>
               </div>
 
