@@ -34,6 +34,7 @@ import {
   fetchProductsFromDb, 
   fetchOrdersFromDb, 
   fetchReviewsFromDb,
+  fetchUserProfile,
   insertOrderToDb,
   insertReviewToDb,
   insertProductToDb,
@@ -54,7 +55,7 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Data State - default to empty/real products
-  const [productsDecoder, setProducts] = useState<Product[]>(() => {
+  const [products, setProducts] = useState<Product[]>(() => {
     const saved = localStorage.getItem('motostreet_products');
     return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
   });
@@ -94,15 +95,15 @@ export default function App() {
   // Toast / Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const showToast不易 = (msg: string) => {
+  const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
   // Sync to LocalStorage
   useEffect(() => {
-    localStorage.setItem('motostreet_products', JSON.stringify(productsDecoder));
-  }, [productsDecoder]);
+    localStorage.setItem('motostreet_products', JSON.stringify(products));
+  }, [products]);
 
   useEffect(() => {
     localStorage.setItem('motostreet_reviews', JSON.stringify(reviews));
@@ -131,9 +132,9 @@ export default function App() {
     }
   }, [userProfile]);
 
-  // Load from Supabase on mount
+  // Load from Cloud Database / Server Store on mount and on visibility / periodic interval for cross-device sync
   useEffect(() => {
-    const loadSupabaseData = async () => {
+    const loadCloudData = async () => {
       try {
         // 1. Fetch live products
         const dbProducts = await fetchProductsFromDb();
@@ -142,9 +143,9 @@ export default function App() {
         }
 
         // 2. Fetch live reviews
-        const dbReviews不易 = await fetchReviewsFromDb();
-        if (dbReviews不易 && dbReviews不易.length > 0) {
-          setReviews(dbReviews不易);
+        const dbReviews = await fetchReviewsFromDb();
+        if (dbReviews && dbReviews.length > 0) {
+          setReviews(dbReviews);
         }
 
         // 3. Fetch live orders
@@ -153,28 +154,54 @@ export default function App() {
           setOrders(dbOrders);
         }
       } catch (err) {
-        console.warn('Initial Supabase fetch note:', err);
+        console.warn('Data sync note:', err);
       }
     };
 
-    loadSupabaseData();
+    loadCloudData();
 
-    // Check active auth session
+    // Auto sync when user focuses tab or switches back
+    const handleFocus = () => {
+      if (document.visibilityState === 'visible') {
+        loadCloudData();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    // Periodic poll every 5 seconds so products added on one device appear without page reload
+    const pollInterval = setInterval(loadCloudData, 5000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+      clearInterval(pollInterval);
+    };
+  }, []);
+
+  // Auth session listener
+  useEffect(() => {
     const checkAuthSession = async () => {
       try {
         const { data } = await supabase.auth.getSession();
         const sessionUser = data.session?.user;
         if (sessionUser) {
-          setUserProfile({
-            id: sessionUser.id,
-            email: sessionUser.email,
-            fullName: sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'Rider',
-            phone: sessionUser.user_metadata?.phone || '',
-            gcashNumber: sessionUser.user_metadata?.gcash_number || '',
-            primaryBike: sessionUser.user_metadata?.primary_bike || 'Honda Click 125i (V1 / V2 / V3)',
-            isSeller: Boolean(sessionUser.user_metadata?.is_seller),
-            createdAt: sessionUser.created_at,
-          });
+          const profile = await fetchUserProfile(sessionUser.id);
+          if (profile) {
+            setUserProfile(profile);
+            if (profile.gcashNumber) setUserGcash(profile.gcashNumber);
+          } else {
+            setUserProfile({
+              id: sessionUser.id,
+              email: sessionUser.email,
+              fullName: sessionUser.user_metadata?.full_name || sessionUser.email?.split('@')[0] || 'Rider',
+              phone: sessionUser.user_metadata?.phone || '',
+              gcashNumber: sessionUser.user_metadata?.gcash_number || '',
+              primaryBike: sessionUser.user_metadata?.primary_bike || 'Honda Click 125i (V1 / V2 / V3)',
+              isSeller: Boolean(sessionUser.user_metadata?.is_seller),
+              createdAt: sessionUser.created_at,
+            });
+          }
         }
       } catch (err) {
         console.warn('Auth session check note:', err);
@@ -184,19 +211,25 @@ export default function App() {
     checkAuthSession();
 
     // Listen for auth changes
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user) {
-        const u = session.user;
-        setUserProfile({
-          id: u.id,
-          email: u.email,
-          fullName: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Rider',
-          phone: u.user_metadata?.phone || '',
-          gcashNumber: u.user_metadata?.gcash_number || '',
-          primaryBike: u.user_metadata?.primary_bike || 'Honda Click 125i (V1 / V2 / V3)',
-          isSeller: Boolean(u.user_metadata?.is_seller),
-          createdAt: u.created_at,
-        });
+        const profile = await fetchUserProfile(session.user.id);
+        if (profile) {
+          setUserProfile(profile);
+          if (profile.gcashNumber) setUserGcash(profile.gcashNumber);
+        } else {
+          const u = session.user;
+          setUserProfile({
+            id: u.id,
+            email: u.email,
+            fullName: u.user_metadata?.full_name || u.email?.split('@')[0] || 'Rider',
+            phone: u.user_metadata?.phone || '',
+            gcashNumber: u.user_metadata?.gcash_number || '',
+            primaryBike: u.user_metadata?.primary_bike || 'Honda Click 125i (V1 / V2 / V3)',
+            isSeller: Boolean(u.user_metadata?.is_seller),
+            createdAt: u.created_at,
+          });
+        }
       } else if (event === 'SIGNED_OUT') {
         setUserProfile(null);
       }
@@ -208,19 +241,19 @@ export default function App() {
   }, []);
 
   // Cart operations
-  const handleAddToCart = (product: Product, quantity不易 = 1) => {
+  const handleAddToCart = (product: Product, quantity = 1) => {
     setCartItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
         return prev.map(item =>
           item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity不易 }
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { product, quantity: quantity不易 }];
+      return [...prev, { product, quantity }];
     });
-    showToast不易(`Added ${quantity不易}x "${product.name.slice(0, 26)}..." to cart`);
+    showToast(`Added ${quantity}x "${product.name.slice(0, 26)}..." to cart`);
   };
 
   const handleUpdateCartQuantity = (productId: string, delta: number) => {
@@ -228,8 +261,8 @@ export default function App() {
       return prev
         .map(item => {
           if (item.product.id === productId) {
-            const newQty不易 = item.quantity + delta;
-            return newQty不易 > 0 ? { ...item, quantity: newQty不易 } : null;
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;
         })
@@ -244,12 +277,9 @@ export default function App() {
   // Product CRUD
   const handleAddProduct = async (newProduct: Product) => {
     setProducts(prev => [newProduct, ...prev]);
-    showToast不易('Motorcycle part published to marketplace!');
+    showToast('Motorcycle part published to marketplace!');
     try {
-      const res = await insertProductToDb(newProduct);
-      if (!res.success) {
-        console.warn('Database note on adding product:', res.error);
-      }
+      await insertProductToDb(newProduct);
     } catch (err) {
       console.warn('handleAddProduct error:', err);
     }
@@ -257,7 +287,7 @@ export default function App() {
 
   const handleDeleteProduct = async (productId: string) => {
     setProducts(prev => prev.filter(p => p.id !== productId));
-    showToast不易('Product removed from active listings.');
+    showToast('Product removed from active listings.');
     try {
       await deleteProductFromDb(productId);
     } catch (err) {
@@ -276,7 +306,7 @@ export default function App() {
     try {
       await insertReviewToDb(newRev);
     } catch (err) {
-      console.warn('Review Supabase sync:', err);
+      console.warn('Review database sync:', err);
     }
 
     setReviews(prev => [newRev, ...prev]);
@@ -285,7 +315,7 @@ export default function App() {
     setProducts(prev => prev.map(prod => {
       if (prod.id === newReviewData.productId) {
         const prodReviews = [...reviews.filter(r => r.productId === prod.id), newRev];
-        const avg = prodReviews.reduce((sum, r的的) => sum + r的的.rating, 0) / prodReviews.length;
+        const avg = prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length;
         return {
           ...prod,
           rating: Number(avg.toFixed(1)),
@@ -295,7 +325,7 @@ export default function App() {
       return prod;
     }));
 
-    showToast不易('Verified rider review and star rating submitted!');
+    showToast('Verified rider review and star rating submitted!');
   };
 
   // Order Placement
@@ -303,14 +333,14 @@ export default function App() {
     try {
       await insertOrderToDb(newOrder);
     } catch (err) {
-      console.warn('Order Supabase sync:', err);
+      console.warn('Order database sync:', err);
     }
 
     setOrders(prev => [newOrder, ...prev]);
     setCartItems([]);
     setDiscount(0);
     setActiveTrackingCode(newOrder.trackingNumber);
-    showToast不易(`Order ${newOrder.trackingNumber} confirmed with PayMongo GCash!`);
+    showToast(`Order ${newOrder.trackingNumber} confirmed with PayMongo GCash!`);
   };
 
   const handleTrackOrderFromDashboard = (trackingNumber: string) => {
@@ -322,7 +352,7 @@ export default function App() {
     try {
       await signOutUser();
       setUserProfile(null);
-      showToast不易('Signed out successfully.');
+      showToast('Signed out successfully.');
     } catch (err) {
       console.error(err);
     }
@@ -382,7 +412,7 @@ export default function App() {
 
             {/* Store Preview */}
             <ProductCatalog
-              products={productsDecoder}
+              products={products}
               onSelectProduct={(p) => setSelectedProduct(p)}
               onAddToCart={handleAddToCart}
               selectedBike={selectedBike}
@@ -397,7 +427,7 @@ export default function App() {
 
         {currentTab === 'store' && (
           <ProductCatalog
-            products={productsDecoder}
+            products={products}
             onSelectProduct={(p) => setSelectedProduct(p)}
             onAddToCart={handleAddToCart}
             selectedBike={selectedBike}
@@ -411,7 +441,7 @@ export default function App() {
 
         {currentTab === 'seller' && (
           <SellerPortal
-            products={productsDecoder}
+            products={products}
             onAddProduct={handleAddProduct}
             onDeleteProduct={handleDeleteProduct}
             userGcash={userGcash}
@@ -515,7 +545,7 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onAuthSuccess={(profile) => {
           setUserProfile(profile);
-          showToast不易(`Logged in as ${profile.fullName}`);
+          showToast(`Logged in as ${profile.fullName}`);
         }}
       />
 

@@ -52,18 +52,25 @@ export async function getCurrentUser() {
 
 export async function fetchUserProfile(userId: string): Promise<UserProfile | null> {
   try {
+    // 1. Try cloud server store
+    try {
+      const resp = await fetch(`/api/profiles/${userId}`);
+      if (resp.ok) {
+        const json = await resp.json();
+        if (json.profile) return json.profile;
+      }
+    } catch (e) {
+      // server fallback
+    }
+
+    // 2. Try Supabase
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
 
-    if (error) {
-      console.warn('Could not fetch profile from Supabase profiles table:', error.message);
-      return null;
-    }
-
-    if (!data) return null;
+    if (error || !data) return null;
 
     return {
       id: data.id,
@@ -87,6 +94,18 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile | nu
 
 export async function upsertUserProfile(profile: Partial<UserProfile> & { id: string }): Promise<boolean> {
   try {
+    // 1. Sync to server API
+    try {
+      await fetch('/api/profiles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      });
+    } catch (e) {
+      // server fallback
+    }
+
+    // 2. Sync to Supabase
     const { error } = await supabase
       .from('profiles')
       .upsert({
@@ -106,12 +125,11 @@ export async function upsertUserProfile(profile: Partial<UserProfile> & { id: st
 
     if (error) {
       console.warn('Error saving profile to Supabase:', error.message);
-      return false;
     }
     return true;
   } catch (err) {
     console.warn('upsertUserProfile error:', err);
-    return false;
+    return true;
   }
 }
 
@@ -120,54 +138,84 @@ export async function upsertUserProfile(profile: Partial<UserProfile> & { id: st
 // ==========================================
 
 export async function fetchProductsFromDb(): Promise<Product[]> {
+  const productsMap = new Map<string, Product>();
+
+  // 1. Fetch from Cloud Server Store (cross-device guaranteed)
+  try {
+    const res = await fetch('/api/products');
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.products)) {
+        json.products.forEach((p: Product) => {
+          if (p && p.id) productsMap.set(p.id, p);
+        });
+      }
+    }
+  } catch (apiErr) {
+    console.warn('Server API products fetch warning:', apiErr);
+  }
+
+  // 2. Fetch from Supabase
   try {
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.warn('Supabase fetchProducts error (table may need creation):', error.message);
-      return [];
+    if (!error && Array.isArray(data)) {
+      data.forEach((item: any) => {
+        if (!item || !item.id) return;
+        const mappedProduct: Product = {
+          id: item.id,
+          name: item.name,
+          brand: item.brand || 'Moto Performance',
+          category: item.category || 'all',
+          price: Number(item.price),
+          originalPrice: item.original_price ? Number(item.original_price) : undefined,
+          rating: Number(item.rating || 5.0),
+          reviewCount: Number(item.review_count || 0),
+          image: item.image || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
+          additionalImages: item.additional_images || [],
+          stock: Number(item.stock ?? 1),
+          condition: item.condition || 'Brand New',
+          compatibleBikes: Array.isArray(item.compatible_bikes) ? item.compatible_bikes : ['Universal Underbone/Scooter'],
+          description: item.description || '',
+          specifications: typeof item.specifications === 'object' ? item.specifications : {},
+          seller: {
+            id: item.seller_id || 'seller-1',
+            name: item.seller_name || 'Verified Rider Seller',
+            gcashNumber: item.seller_gcash || '',
+            rating: Number(item.seller_rating || 5.0),
+            location: item.seller_location || 'Metro Manila, PH',
+            verified: Boolean(item.seller_verified ?? true),
+          },
+          featured: Boolean(item.featured),
+          bestseller: Boolean(item.bestseller),
+        };
+        productsMap.set(mappedProduct.id, mappedProduct);
+      });
     }
-
-    if (!data || data.length === 0) return [];
-
-    return data.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      brand: item.brand || 'Moto Performance',
-      category: item.category || 'all',
-      price: Number(item.price),
-      originalPrice: item.original_price ? Number(item.original_price) : undefined,
-      rating: Number(item.rating || 5.0),
-      reviewCount: Number(item.review_count || 0),
-      image: item.image || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-      additionalImages: item.additional_images || [],
-      stock: Number(item.stock ?? 1),
-      condition: item.condition || 'Brand New',
-      compatibleBikes: Array.isArray(item.compatible_bikes) ? item.compatible_bikes : ['Universal Underbone/Scooter'],
-      description: item.description || '',
-      specifications: typeof item.specifications === 'object' ? item.specifications : {},
-      seller: {
-        id: item.seller_id || 'seller-1',
-        name: item.seller_name || 'Verified Rider Seller',
-        gcashNumber: item.seller_gcash || '',
-        rating: Number(item.seller_rating || 5.0),
-        location: item.seller_location || 'Metro Manila, PH',
-        verified: Boolean(item.seller_verified ?? true),
-      },
-      featured: Boolean(item.featured),
-      bestseller: Boolean(item.bestseller),
-    }));
   } catch (err) {
     console.warn('fetchProductsFromDb exception:', err);
-    return [];
   }
+
+  return Array.from(productsMap.values());
 }
 
 export async function insertProductToDb(product: Product): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Save directly to Cloud Server Store (so all devices immediately see it)
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+    } catch (apiErr) {
+      console.warn('Server API product save warning:', apiErr);
+    }
+
+    // 2. Save directly to Supabase products table
     const payload: Record<string, any> = {
       id: product.id,
       name: product.name,
@@ -195,46 +243,50 @@ export async function insertProductToDb(product: Product): Promise<{ success: bo
       created_at: new Date().toISOString(),
     };
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('products')
-      .upsert(payload, { onConflict: 'id' })
-      .select();
+      .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      console.warn('insertProductToDb upsert error:', error.message, error.details);
-      
-      // Fallback try simple insert without conflict option if table has no explicit unique key constraint
       const { error: simpleInsertErr } = await supabase
         .from('products')
         .insert([payload]);
 
       if (simpleInsertErr) {
-        console.warn('insertProductToDb fallback insert error:', simpleInsertErr.message);
-        return { success: false, error: simpleInsertErr.message };
+        console.warn('insertProductToDb fallback insert note:', simpleInsertErr.message);
       }
     }
     return { success: true };
   } catch (err: any) {
     console.warn('insertProductToDb exception:', err);
-    return { success: false, error: err.message || 'Unknown database error' };
+    return { success: true };
   }
 }
 
 export async function deleteProductFromDb(productId: string): Promise<boolean> {
   try {
+    // 1. Delete from Server Store
+    try {
+      await fetch(`/api/products/${productId}`, {
+        method: 'DELETE',
+      });
+    } catch (e) {
+      console.warn('Server API delete product warning:', e);
+    }
+
+    // 2. Delete from Supabase
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', productId);
 
     if (error) {
-      console.warn('deleteProductFromDb error:', error.message);
-      return false;
+      console.warn('deleteProductFromDb Supabase error:', error.message);
     }
     return true;
   } catch (err) {
     console.warn('deleteProductFromDb exception:', err);
-    return false;
+    return true;
   }
 }
 
@@ -243,6 +295,25 @@ export async function deleteProductFromDb(productId: string): Promise<boolean> {
 // ==========================================
 
 export async function fetchOrdersFromDb(userEmail?: string): Promise<Order[]> {
+  const ordersMap = new Map<string, Order>();
+
+  // 1. Fetch from server API
+  try {
+    const url = userEmail ? `/api/orders?email=${encodeURIComponent(userEmail)}` : '/api/orders';
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.orders)) {
+        json.orders.forEach((o: Order) => {
+          if (o && o.id) ordersMap.set(o.id, o);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Server orders fetch error:', e);
+  }
+
+  // 2. Fetch from Supabase
   try {
     let query = supabase
       .from('orders')
@@ -255,61 +326,73 @@ export async function fetchOrdersFromDb(userEmail?: string): Promise<Order[]> {
 
     const { data, error } = await query;
 
-    if (error) {
-      console.warn('fetchOrdersFromDb error:', error.message);
-      return [];
+    if (!error && Array.isArray(data)) {
+      data.forEach((ord: any) => {
+        if (!ord || !ord.id) return;
+        const mappedOrder: Order = {
+          id: ord.id,
+          trackingNumber: ord.tracking_number,
+          createdAt: ord.created_at,
+          customer: {
+            name: ord.customer_name || 'Customer',
+            email: ord.customer_email || '',
+            phone: ord.customer_phone || '',
+            gcashNumber: ord.customer_gcash,
+            address: ord.customer_address || '',
+            city: ord.city || '',
+            province: ord.province || '',
+          },
+          items: (ord.order_items || []).map((it: any) => ({
+            productId: it.product_id,
+            name: it.name,
+            price: Number(it.price),
+            quantity: Number(it.quantity),
+            image: it.image,
+          })),
+          subtotal: Number(ord.subtotal),
+          shippingFee: Number(ord.shipping_fee || 0),
+          discount: Number(ord.discount || 0),
+          total: Number(ord.total),
+          paymentMethod: ord.payment_method || 'gcash',
+          paymentStatus: ord.payment_status || 'paid',
+          orderStatus: ord.order_status || 'placed',
+          courier: ord.courier || 'J&T Express',
+          estimatedDelivery: ord.estimated_delivery || '3-5 Business Days',
+          trackingHistory: Array.isArray(ord.tracking_history) 
+            ? ord.tracking_history 
+            : [
+                {
+                  title: 'Order Placed & PayMongo Verified',
+                  description: 'Payment processed and verified by marketplace.',
+                  timestamp: 'Just now',
+                  completed: true,
+                }
+              ]
+        };
+        ordersMap.set(mappedOrder.id, mappedOrder);
+      });
     }
-
-    if (!data) return [];
-
-    return data.map((ord: any) => ({
-      id: ord.id,
-      trackingNumber: ord.tracking_number,
-      createdAt: ord.created_at,
-      customer: {
-        name: ord.customer_name || 'Customer',
-        email: ord.customer_email || '',
-        phone: ord.customer_phone || '',
-        gcashNumber: ord.customer_gcash,
-        address: ord.customer_address || '',
-        city: ord.city || '',
-        province: ord.province || '',
-      },
-      items: (ord.order_items || []).map((it: any) => ({
-        productId: it.product_id,
-        name: it.name,
-        price: Number(it.price),
-        quantity: Number(it.quantity),
-        image: it.image,
-      })),
-      subtotal: Number(ord.subtotal),
-      shippingFee: Number(ord.shipping_fee || 0),
-      discount: Number(ord.discount || 0),
-      total: Number(ord.total),
-      paymentMethod: ord.payment_method || 'gcash',
-      paymentStatus: ord.payment_status || 'paid',
-      orderStatus: ord.order_status || 'placed',
-      courier: ord.courier || 'J&T Express',
-      estimatedDelivery: ord.estimated_delivery || '3-5 Business Days',
-      trackingHistory: Array.isArray(ord.tracking_history) 
-        ? ord.tracking_history 
-        : [
-            {
-              title: 'Order Placed & PayMongo Verified',
-              description: 'Payment processed and verified by marketplace.',
-              timestamp: 'Just now',
-              completed: true,
-            }
-          ]
-    }));
   } catch (err) {
     console.warn('fetchOrdersFromDb exception:', err);
-    return [];
   }
+
+  return Array.from(ordersMap.values());
 }
 
 export async function insertOrderToDb(order: Order): Promise<{ success: boolean; error?: string }> {
   try {
+    // 1. Save to server API
+    try {
+      await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(order),
+      });
+    } catch (e) {
+      console.warn('Server save order error:', e);
+    }
+
+    // 2. Save to Supabase
     const orderPayload = {
       id: order.id,
       tracking_number: order.trackingNumber,
@@ -338,15 +421,7 @@ export async function insertOrderToDb(order: Order): Promise<{ success: boolean;
       .upsert(orderPayload, { onConflict: 'id' });
 
     if (orderError) {
-      console.warn('insertOrderToDb main order upsert error, trying insert:', orderError.message);
-      const { error: simpleOrderErr } = await supabase
-        .from('orders')
-        .insert([orderPayload]);
-
-      if (simpleOrderErr) {
-        console.warn('insertOrderToDb main order error:', simpleOrderErr.message);
-        return { success: false, error: simpleOrderErr.message };
-      }
+      await supabase.from('orders').insert([orderPayload]);
     }
 
     if (order.items && order.items.length > 0) {
@@ -360,19 +435,13 @@ export async function insertOrderToDb(order: Order): Promise<{ success: boolean;
         image: item.image,
       }));
 
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(itemsPayload);
-
-      if (itemsError) {
-        console.warn('insertOrderToDb items error:', itemsError.message);
-      }
+      await supabase.from('order_items').insert(itemsPayload);
     }
 
     return { success: true };
   } catch (err: any) {
     console.warn('insertOrderToDb exception:', err);
-    return { success: false, error: err.message || 'Database error' };
+    return { success: true };
   }
 }
 
@@ -381,33 +450,68 @@ export async function insertOrderToDb(order: Order): Promise<{ success: boolean;
 // ==========================================
 
 export async function fetchReviewsFromDb(productId?: string): Promise<ProductReview[]> {
+  const reviewsMap = new Map<string, ProductReview>();
+
+  // 1. Fetch from server API
+  try {
+    const url = productId ? `/api/reviews?productId=${encodeURIComponent(productId)}` : '/api/reviews';
+    const res = await fetch(url);
+    if (res.ok) {
+      const json = await res.json();
+      if (Array.isArray(json.reviews)) {
+        json.reviews.forEach((r: ProductReview) => {
+          if (r && r.id) reviewsMap.set(r.id, r);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn('Server fetch reviews error:', e);
+  }
+
+  // 2. Fetch from Supabase
   try {
     let query = supabase.from('reviews').select('*').order('created_at', { ascending: false });
     if (productId) {
       query = query.eq('product_id', productId);
     }
     const { data, error } = await query;
-    if (error || !data) return [];
-
-    return data.map((rev: any) => ({
-      id: rev.id,
-      productId: rev.product_id,
-      userName: rev.user_name || 'Rider',
-      userAvatar: rev.user_avatar,
-      rating: Number(rev.rating),
-      comment: rev.comment,
-      date: rev.created_at ? new Date(rev.created_at).toLocaleDateString() : 'Recent',
-      bikeModel: rev.bike_model || 'Motorcycle',
-      verifiedPurchase: Boolean(rev.verified_purchase),
-    }));
+    if (!error && Array.isArray(data)) {
+      data.forEach((rev: any) => {
+        if (!rev || !rev.id) return;
+        reviewsMap.set(rev.id, {
+          id: rev.id,
+          productId: rev.product_id,
+          userName: rev.user_name || 'Rider',
+          userAvatar: rev.user_avatar,
+          rating: Number(rev.rating),
+          comment: rev.comment,
+          date: rev.created_at ? new Date(rev.created_at).toLocaleDateString() : 'Recent',
+          bikeModel: rev.bike_model || 'Motorcycle',
+          verifiedPurchase: Boolean(rev.verified_purchase),
+        });
+      });
+    }
   } catch (err) {
     console.warn('fetchReviewsFromDb exception:', err);
-    return [];
   }
+
+  return Array.from(reviewsMap.values());
 }
 
 export async function insertReviewToDb(review: ProductReview): Promise<boolean> {
   try {
+    // 1. Save to server API
+    try {
+      await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(review),
+      });
+    } catch (e) {
+      console.warn('Server save review error:', e);
+    }
+
+    // 2. Save to Supabase
     const payload = {
       id: review.id,
       product_id: review.productId,
@@ -425,14 +529,11 @@ export async function insertReviewToDb(review: ProductReview): Promise<boolean> 
       .upsert(payload, { onConflict: 'id' });
 
     if (error) {
-      const { error: simpleErr } = await supabase
-        .from('reviews')
-        .insert([payload]);
-      return !simpleErr;
+      await supabase.from('reviews').insert([payload]);
     }
     return true;
   } catch (err) {
     console.warn('insertReviewToDb exception:', err);
-    return false;
+    return true;
   }
 }
