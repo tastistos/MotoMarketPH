@@ -10,7 +10,6 @@ import { UserDashboard } from './components/UserDashboard';
 import { OrderTrackingView } from './components/OrderTrackingView';
 import { AboutContactPage } from './components/AboutContactPage';
 import { SiteMapModal } from './components/SiteMapModal';
-import { VoiceflowChatModal } from './components/VoiceflowChatModal';
 import { GuidesModal } from './components/GuidesModal';
 import { AuthModal } from './components/AuthModal';
 import { Footer } from './components/Footer';
@@ -86,7 +85,6 @@ export default function App() {
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
   const [isSiteMapOpen, setIsSiteMapOpen] = useState<boolean>(false);
-  const [isVoiceflowOpen, setIsVoiceflowOpen] = useState<boolean>(false);
   const [isGuidesOpen, setIsGuidesOpen] = useState<boolean>(false);
   const [activeTrackingCode, setActiveTrackingCode] = useState<string>('');
 
@@ -334,7 +332,11 @@ export default function App() {
         cartCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenSiteMap={() => setIsSiteMapOpen(true)}
-        onOpenVoiceflow={() => setIsVoiceflowOpen(true)}
+        onOpenVoiceflow={() => {
+          if (typeof window !== 'undefined' && (window as any).voiceflow?.chat) {
+            (window as any).voiceflow.chat.open();
+          }
+        }}
         onOpenGuides={() => setIsGuidesOpen(true)}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
@@ -354,7 +356,11 @@ export default function App() {
                 setCurrentTab('store');
               }}
               onExploreCatalog={() => setCurrentTab('store')}
-              onOpenVoiceflow={() => setIsVoiceflowOpen(true)}
+              onOpenVoiceflow={() => {
+                if (typeof window !== 'undefined' && (window as any).voiceflow?.chat) {
+                  (window as any).voiceflow.chat.open();
+                }
+              }}
               onOpenGuides={() => setIsGuidesOpen(true)}
             />
 
@@ -470,12 +476,11 @@ export default function App() {
         onClose={() => setIsSiteMapOpen(false)}
         onNavigate={(tab) => setCurrentTab(tab)}
         onOpenGuides={() => setIsGuidesOpen(true)}
-        onOpenVoiceflow={() => setIsVoiceflowOpen(true)}
-      />
-
-      <VoiceflowChatModal
-        isOpen={isVoiceflowOpen}
-        onClose={() => setIsVoiceflowOpen(false)}
+        onOpenVoiceflow={() => {
+          if (typeof window !== 'undefined' && (window as any).voiceflow?.chat) {
+            (window as any).voiceflow.chat.open();
+          }
+        }}
       />
 
       <GuidesModal
@@ -488,7 +493,11 @@ export default function App() {
         onNavigate={(tab) => setCurrentTab(tab)}
         onOpenSiteMap={() => setIsSiteMapOpen(true)}
         onOpenGuides={() => setIsGuidesOpen(true)}
-        onOpenVoiceflow={() => setIsVoiceflowOpen(true)}
+        onOpenVoiceflow={() => {
+          if (typeof window !== 'undefined' && (window as any).voiceflow?.chat) {
+            (window as any).voiceflow.chat.open();
+          }
+        }}
       />
 
     </div>

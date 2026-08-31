@@ -9,6 +9,7 @@
     <meta property="og:description" content="Premier online marketplace for underbone and scooter motorcycle parts, featuring PayMongo & GCash checkout, seller portal, live order tracking, and AI tuning mechanic." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23DC2626' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='18.5' cy='17.5' r='3.5'/%3E%3Ccircle cx='5.5' cy='17.5' r='3.5'/%3E%3Ccircle cx='15' cy='5' r='1'/%3E%3Cpath d='M12 17.5V14l-3-3 4-3 2 3h2'/%3E%3C/svg%3E" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -16,6 +17,49 @@
   <body class="bg-neutral-950 text-neutral-100 antialiased selection:bg-red-600 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Voiceflow AI Webchat Integration (Project ID: 6a954fda9c3c19ad3d86a17a) -->
+    <script type="text/javascript">
+      (function(d, t) {
+          var v = d.createElement(t), s = d.getElementsByTagName(t)[0];
+          v.onload = function() {
+            if (window.voiceflow && window.voiceflow.chat) {
+              window.voiceflow.chat.load({
+                verify: { projectID: '6a954fda9c3c19ad3d86a17a' },
+                url: 'https://general-runtime.voiceflow.com',
+                versionID: 'production',
+                autostart: true,
+                launch: {
+                  event: { type: 'launch' }
+                },
+                assistant: {
+                  title: "MotoStreet AI Mechanic",
+                  description: "Motorcycle Parts & Tuning Specialist",
+                  color: "#DC2626"
+                }
+              }).then(function() {
+                setTimeout(function() {
+                  try {
+                    if (window.voiceflow && window.voiceflow.chat) {
+                      window.voiceflow.chat.open();
+                      if (typeof window.voiceflow.chat.start === 'function') {
+                        window.voiceflow.chat.start();
+                      }
+                    }
+                  } catch (e) {
+                    console.log('Voiceflow ready');
+                  }
+                }, 500);
+              }).catch(function(err) {
+                console.warn('Voiceflow load info:', err);
+              });
+            }
+          };
+          v.src = "https://cdn.voiceflow.com/widget/bundle.mjs"; 
+          v.type = "text/javascript"; 
+          s.parentNode.insertBefore(v, s);
+      })(document, 'script');
+    </script>
   </body>
 </html>
 

@@ -60,10 +60,6 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
   const [postSuccess, setPostSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // GCash escrow balance simulation
-  const [payoutSuccess, setPayoutSuccess] = useState(false);
-  const [sellerBalance, setSellerBalance] = useState(4850);
-
   const handleBikeToggle = (bikeName: string) => {
     if (selectedBikes.includes(bikeName)) {
       setSelectedBikes(selectedBikes.filter(b => b !== bikeName));
@@ -178,62 +174,30 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
     onDeleteProduct(id);
   };
 
-  const handlePayoutGCash = () => {
-    if (sellerBalance <= 0) return;
-    setPayoutSuccess(true);
-    setTimeout(() => {
-      setSellerBalance(0);
-      setPayoutSuccess(false);
-    }, 2000);
-  };
-
   return (
     <div className="bg-neutral-950 min-h-screen py-8 px-4 sm:px-6 lg:px-8 border-b border-neutral-850 font-['Plus_Jakarta_Sans']">
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* Banner */}
         <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-          <div className="space-y-2 max-w-xl z-10">
+          <div className="space-y-2 max-w-2xl z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950 text-red-400 text-xs font-bold border border-red-800">
               <Store className="w-3.5 h-3.5" />
               <span>MOTOSTREET SELLER & TUNER HUB</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white font-['Outfit'] uppercase tracking-tight">
-              Post Your Parts & Receive PayMongo GCash Payouts
+              Post Your Parts & Connect With Active Riders
             </h1>
             <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-              Reach thousands of daily Honda Click 125/160, XRM 125, Raider 150, Wave 125, and Aerox riders across Metro Manila and Philippine provinces.
+              Reach thousands of daily Honda Click 125/160, XRM 125, Raider 150, Wave 125, and Aerox riders across Metro Manila and Philippine provinces. Fast GCash buyer inquiries and direct rider-to-rider deals.
             </p>
           </div>
 
-          {/* GCash Escrow Card */}
-          <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-5 shrink-0 min-w-[260px] space-y-3 z-10">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-neutral-400 font-bold uppercase tracking-wider">Escrow Balance</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 font-bold">
-                GCash Instant
-              </span>
+          <div className="flex items-center gap-3 z-10 shrink-0">
+            <div className="px-4 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-center">
+              <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider block">Direct Payouts</span>
+              <span className="text-emerald-400 text-xs font-bold font-mono">GCash & PayMongo</span>
             </div>
-            <div>
-              <span className="text-2xl sm:text-3xl font-black text-white font-['Outfit']">
-                ₱{sellerBalance.toLocaleString()} PHP
-              </span>
-              <p className="text-[11px] text-neutral-400 mt-0.5">
-                Payout Phone: <span className="text-emerald-400 font-mono font-bold">{gcashInput}</span>
-              </p>
-            </div>
-            <button
-              onClick={handlePayoutGCash}
-              disabled={sellerBalance <= 0}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
-                sellerBalance > 0 
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30' 
-                  : 'bg-neutral-850 text-neutral-500 cursor-not-allowed'
-              }`}
-            >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span>{payoutSuccess ? 'Payout Transferred!' : 'Withdraw to GCash'}</span>
-            </button>
           </div>
         </div>
 

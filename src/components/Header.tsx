@@ -1,24 +1,19 @@
 import React, { useState } from 'react';
 import { 
-  Wrench, 
   ShoppingCart, 
   Search, 
   Bike, 
-  User, 
   Store, 
   LayoutDashboard, 
-  Sparkles, 
   Menu, 
   X, 
-  Code2, 
-  ShieldCheck,
-  ChevronDown,
-  LogOut,
-  Database,
-  LogIn
+  ChevronDown, 
+  LogOut, 
+  LogIn 
 } from 'lucide-react';
 import { BikeModel, NavTab, UserProfile } from '../types';
 import { POPULAR_BIKES } from '../data/mockProducts';
+import logoIcon from '../assets/images/motostreet_logo_icon_1788169595873.jpg';
 
 interface HeaderProps {
   currentTab: NavTab;
@@ -29,9 +24,9 @@ interface HeaderProps {
   setSelectedBike: (bike: BikeModel | null) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  onOpenVoiceflow: () => void;
-  onOpenGuides: () => void;
-  onOpenSiteMap: () => void;
+  onOpenVoiceflow?: () => void;
+  onOpenGuides?: () => void;
+  onOpenSiteMap?: () => void;
   userProfile: UserProfile | null;
   onOpenAuth: () => void;
   onSignOut: () => void;
@@ -46,9 +41,6 @@ export const Header: React.FC<HeaderProps> = ({
   setSelectedBike,
   searchQuery,
   setSearchQuery,
-  onOpenVoiceflow,
-  onOpenGuides,
-  onOpenSiteMap,
   userProfile,
   onOpenAuth,
   onSignOut,
@@ -59,48 +51,22 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-40 w-full bg-neutral-950/95 backdrop-blur-md border-b border-neutral-850 font-['Plus_Jakarta_Sans']">
-      
-      {/* Top Value Banner */}
-      <div className="bg-neutral-900/90 text-neutral-300 text-xs py-1 px-4 border-b border-neutral-800">
-        <div className="max-w-7xl mx-auto flex justify-between items-center text-[11px]">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-red-950 text-red-400 font-bold font-['Outfit'] border border-red-800/60">
-              🇵🇭 MOTOSTREET PH
-            </span>
-            <span className="hidden sm:inline text-neutral-400">
-              Direct Rider-to-Rider & Tuner Parts Marketplace • Honda XRM 125, Click 125/160, Raider 150, Wave 125, Aerox
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 text-emerald-400 font-medium">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Supabase & PayMongo GCash Ready</span>
-              <span className="md:hidden">Supabase</span>
-            </div>
-
-            <button 
-              onClick={onOpenGuides}
-              className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 transition-colors underline"
-            >
-              <Database className="w-3 h-3" />
-              <span>SQL Schema</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Navigation Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3 sm:gap-6">
           
-          {/* Logo */}
+          {/* Logo & Emblem */}
           <div 
             onClick={() => setCurrentTab('home')} 
             className="flex items-center gap-2.5 cursor-pointer group shrink-0"
           >
-            <div className="w-9 h-9 rounded-xl bg-red-600 flex items-center justify-center text-white shadow-md shadow-red-600/30 group-hover:scale-105 transition-transform">
-              <Wrench className="w-4 h-4 transform -rotate-45" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-neutral-750 bg-neutral-900 shadow-md shadow-red-600/10 group-hover:border-red-500 transition-all shrink-0">
+              <img 
+                src={logoIcon} 
+                alt="MotoStreet PH Logo" 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+              />
             </div>
             <div>
               <div className="flex items-center gap-1">
@@ -241,15 +207,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* AI Mechanic Assistant */}
-            <button
-              onClick={onOpenVoiceflow}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold shadow-md shadow-red-600/30 active:scale-95 transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">AI Mechanic</span>
-            </button>
-
             {/* Auth / Profile Button */}
             {userProfile ? (
               <div className="relative">
@@ -358,7 +315,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-neutral-850 bg-neutral-950 px-4 pt-3 pb-6 space-y-2 animate-in slide-in-from-top-4">
-          <div className="grid grid-cols-2 gap-2 pb-3 border-b border-neutral-850">
+          <div className="grid grid-cols-2 gap-2 pb-2">
             <button
               onClick={() => { setCurrentTab('home'); setMobileMenuOpen(false); }}
               className={`p-2.5 rounded-xl text-left text-xs font-bold ${
@@ -390,23 +347,6 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               📊 My Garage
-            </button>
-          </div>
-
-          <div className="pt-2 flex flex-col gap-2">
-            <button
-              onClick={() => { onOpenVoiceflow(); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 px-3 rounded-xl bg-red-600 text-white text-xs font-bold flex items-center justify-center gap-2"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Ask AI Moto Mechanic & Diagnoser</span>
-            </button>
-            <button
-              onClick={() => { onOpenGuides(); setMobileMenuOpen(false); }}
-              className="w-full py-2.5 px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-cyan-400 text-xs font-semibold flex items-center justify-center gap-2"
-            >
-              <Database className="w-4 h-4" />
-              <span>View Supabase SQL & Vercel Guide</span>
             </button>
           </div>
         </div>
