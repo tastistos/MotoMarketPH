@@ -9,7 +9,7 @@ import {
   Bike,
   CreditCard
 } from 'lucide-react';
-import { CartItem } from '../types';
+import { CartItem, UserProfile } from '../types';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -20,6 +20,8 @@ interface CartDrawerProps {
   onProceedToCheckout: () => void;
   discount: number;
   setDiscount: (discount: number) => void;
+  userProfile?: UserProfile | null;
+  onOpenAuth?: () => void;
 }
 
 export const CartDrawer: React.FC<CartDrawerProps> = ({
@@ -31,6 +33,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onProceedToCheckout,
   discount,
   setDiscount,
+  userProfile,
+  onOpenAuth,
 }) => {
   if (!isOpen) return null;
 
@@ -211,12 +215,17 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
             {/* Checkout Button */}
             <button
               onClick={() => {
-                onClose();
-                onProceedToCheckout();
+                if (!userProfile && onOpenAuth) {
+                  onClose();
+                  onOpenAuth();
+                } else {
+                  onClose();
+                  onProceedToCheckout();
+                }
               }}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 transition-all"
             >
-              <span>Proceed to PayMongo Checkout</span>
+              <span>{userProfile ? 'Proceed to PayMongo Checkout' : 'Sign In to Checkout Parts'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 

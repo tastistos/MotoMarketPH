@@ -460,23 +460,34 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                 </div>
 
                 {/* Submit */}
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
-                >
-                  {saving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Publishing to Supabase...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle className="w-4 h-4" />
-                      <span>Publish Listing to Marketplace</span>
-                    </>
-                  )}
-                </button>
+                {!userProfile ? (
+                  <button
+                    type="button"
+                    onClick={onOpenAuth}
+                    className="w-full py-3.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Sign In or Register to Publish Listing</span>
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Publishing to Supabase...</span>
+                      </>
+                    ) : (
+                      <>
+                        <PlusCircle className="w-4 h-4" />
+                        <span>Publish Listing to Marketplace</span>
+                      </>
+                    )}
+                  </button>
+                )}
 
               </form>
 

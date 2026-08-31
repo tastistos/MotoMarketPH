@@ -263,8 +263,13 @@ export default function App() {
     };
   }, []);
 
-  // Cart operations
+  // Cart operations & Direct Buy
   const handleAddToCart = (product: Product, quantity = 1) => {
+    if (!userProfile) {
+      showToast('Please sign in or register to add parts to cart.');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setCartItems(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
@@ -277,6 +282,19 @@ export default function App() {
       return [...prev, { product, quantity }];
     });
     showToast(`Added ${quantity}x "${product.name.slice(0, 26)}..." to cart`);
+  };
+
+  const handleDirectBuy = (product: Product, quantity = 1) => {
+    if (!userProfile) {
+      showToast('Please sign in or register to buy products.');
+      setIsAuthModalOpen(true);
+      return;
+    }
+    // Set direct buy item and open CheckoutModal directly without going through cart drawer
+    setCartItems([{ product, quantity }]);
+    setSelectedProduct(null);
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
   };
 
   const handleUpdateCartQuantity = (productId: string, delta: number) => {
@@ -299,6 +317,11 @@ export default function App() {
 
   // Product CRUD
   const handleAddProduct = async (newProduct: Product) => {
+    if (!userProfile) {
+      showToast('Please sign in or register to post parts.');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setProducts(prev => [newProduct, ...prev]);
     showToast('Motorcycle part published to marketplace!');
     try {
@@ -309,6 +332,11 @@ export default function App() {
   };
 
   const handleDeleteProduct = async (productId: string) => {
+    if (!userProfile) {
+      showToast('Please sign in or register to manage parts.');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setProducts(prev => prev.filter(p => p.id !== productId));
     showToast('Product removed from active listings.');
     try {
@@ -320,6 +348,11 @@ export default function App() {
 
   // Review Submission
   const handleAddReview = async (newReviewData: Omit<ProductReview, 'id' | 'date'>) => {
+    if (!userProfile) {
+      showToast('Please sign in or register to leave a customer review.');
+      setIsAuthModalOpen(true);
+      return;
+    }
     const newRev: ProductReview = {
       ...newReviewData,
       id: `rev-${Date.now()}`,
@@ -439,12 +472,15 @@ export default function App() {
               products={products}
               onSelectProduct={(p) => setSelectedProduct(p)}
               onAddToCart={handleAddToCart}
+              onDirectBuy={handleDirectBuy}
               selectedBike={selectedBike}
               setSelectedBike={setSelectedBike}
               searchQuery={searchQuery}
               selectedCategory={selectedCategory}
               setSelectedCategory={setSelectedCategory}
               onNavigateToSeller={() => setCurrentTab('seller')}
+              userProfile={userProfile}
+              onOpenAuth={() => setIsAuthModalOpen(true)}
             />
           </div>
         )}
@@ -454,12 +490,15 @@ export default function App() {
             products={products}
             onSelectProduct={(p) => setSelectedProduct(p)}
             onAddToCart={handleAddToCart}
+            onDirectBuy={handleDirectBuy}
             selectedBike={selectedBike}
             setSelectedBike={setSelectedBike}
             searchQuery={searchQuery}
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
             onNavigateToSeller={() => setCurrentTab('seller')}
+            userProfile={userProfile}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
           />
         )}
 
@@ -516,8 +555,11 @@ export default function App() {
         product={selectedProduct}
         onClose={() => setSelectedProduct(null)}
         onAddToCart={handleAddToCart}
+        onDirectBuy={handleDirectBuy}
         reviews={reviews}
         onAddReview={handleAddReview}
+        userProfile={userProfile}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       <CartDrawer
@@ -532,6 +574,8 @@ export default function App() {
         }}
         discount={discount}
         setDiscount={setDiscount}
+        userProfile={userProfile}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
       />
 
       <CheckoutModal

@@ -101,8 +101,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
   const [cardExpiry, setCardExpiry] = useState('12/28');
   const [cardCvc, setCardCvc] = useState('888');
-  const [gcashOtp, setGcashOtp] = useState('');
-  const [otpStep, setOtpStep] = useState(false);
 
   // Success order cache
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
@@ -113,6 +111,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleProceedToPayment = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userProfile && onOpenAuth) {
+      onOpenAuth();
+      return;
+    }
     if (!customerName || !customerPhone || !shippingAddress) return;
     if (gcashNumber) setUserGcash(gcashNumber);
 
@@ -133,8 +135,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleExecutePayment = async () => {
-    if (paymentMethod === 'gcash' && !otpStep) {
-      setOtpStep(true);
+    if (!userProfile) {
+      if (onOpenAuth) onOpenAuth();
       return;
     }
 
@@ -298,12 +300,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                 </div>
               ) : (
-                <div className="p-3 rounded-xl bg-neutral-900/80 border border-neutral-800 text-neutral-300 text-xs flex items-center justify-between gap-2">
+                <div className="p-3.5 rounded-xl bg-red-950/40 border border-red-800/80 text-neutral-300 text-xs flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-red-400 shrink-0" />
-                    <span className="text-[11px]">
-                      Have an account? Log in to auto-fill your delivery info instantly.
-                    </span>
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <div>
+                      <span className="text-xs font-bold text-white block">Rider Account Required to Buy</span>
+                      <span className="text-[11px] text-neutral-300">
+                        Please register or sign in to complete your PayMongo checkout and secure parts warranty.
+                      </span>
+                    </div>
                   </div>
                   {onOpenAuth && (
                     <button
@@ -312,9 +317,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         onClose();
                         onOpenAuth();
                       }}
-                      className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-[10px] uppercase tracking-wider transition-colors shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider transition-colors shrink-0 shadow-md shadow-red-600/30"
                     >
-                      Sign In
+                      Sign In / Register
                     </button>
                   )}
                 </div>
@@ -487,7 +492,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {/* GCash */}
                   <button
                     type="button"
-                    onClick={() => { setPaymentMethod('gcash'); setOtpStep(false); }}
+                    onClick={() => setPaymentMethod('gcash')}
                     className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
                       paymentMethod === 'gcash'
                         ? 'bg-blue-950/40 border-blue-500 text-white shadow-lg'
@@ -513,7 +518,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {/* Credit / Debit Card */}
                   <button
                     type="button"
-                    onClick={() => { setPaymentMethod('paymongo_card'); setOtpStep(false); }}
+                    onClick={() => setPaymentMethod('paymongo_card')}
                     className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
                       paymentMethod === 'paymongo_card'
                         ? 'bg-red-950/40 border-red-600 text-white shadow-lg'
@@ -534,7 +539,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {/* Maya */}
                   <button
                     type="button"
-                    onClick={() => { setPaymentMethod('maya'); setOtpStep(false); }}
+                    onClick={() => setPaymentMethod('maya')}
                     className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
                       paymentMethod === 'maya'
                         ? 'bg-emerald-950/40 border-emerald-500 text-white shadow-lg'
@@ -555,7 +560,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   {/* QR PH */}
                   <button
                     type="button"
-                    onClick={() => { setPaymentMethod('qrph'); setOtpStep(false); }}
+                    onClick={() => setPaymentMethod('qrph')}
                     className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
                       paymentMethod === 'qrph'
                         ? 'bg-cyan-950/40 border-cyan-500 text-white shadow-lg'
@@ -579,48 +584,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               {paymentMethod === 'gcash' && (
                 <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-800/40 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-400">PayMongo GCash Checkout</span>
-                    <span className="text-[10px] text-neutral-400">Sandbox / Live Active</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-blue-400">PayMongo GCash Direct Debit</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 font-mono font-bold border border-blue-700/50">
+                        Test Mode Active
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-semibold">No OTP Required</span>
                   </div>
 
-                  {!otpStep ? (
-                    <div className="space-y-2">
-                      <label className="text-[11px] text-neutral-300 block">GCash Registered Mobile Number:</label>
-                      <input
-                        type="text"
-                        value={gcashNumber}
-                        onChange={(e) => setGcashNumber(e.target.value)}
-                        placeholder="0917-XXX-XXXX"
-                        className="w-full bg-neutral-950 border border-blue-900 text-xs rounded-lg px-3 py-2 text-white font-mono"
-                      />
-                      <p className="text-[10px] text-neutral-400">
-                        Clicking "Authorize GCash" will simulate PayMongo's secure SMS OTP authentication.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label className="text-[11px] text-emerald-400 block font-semibold">
-                        Enter 6-Digit GCash Authentication OTP:
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={gcashOtp}
-                        onChange={(e) => setGcashOtp(e.target.value)}
-                        placeholder="e.g. 582910 (Any 6 digits)"
-                        className="w-full bg-neutral-950 border border-emerald-600 text-sm rounded-lg px-3 py-2 text-emerald-400 font-mono tracking-widest text-center"
-                      />
-                      <p className="text-[10px] text-neutral-400">
-                        OTP sent to {gcashNumber}. (Test mode: Enter any 6 numbers to verify).
-                      </p>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-semibold text-neutral-300 block">GCash Registered Mobile Number:</label>
+                    <input
+                      type="text"
+                      value={gcashNumber}
+                      onChange={(e) => setGcashNumber(e.target.value)}
+                      placeholder="0917-XXX-XXXX"
+                      className="w-full bg-neutral-950 border border-blue-900 text-xs rounded-lg px-3 py-2 text-white font-mono focus:outline-none focus:border-blue-500"
+                    />
+                    <p className="text-[10px] text-neutral-400 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Instant checkout enabled using PayMongo test keys. No SMS OTP is required.</span>
+                    </p>
+                  </div>
                 </div>
               )}
 
               {paymentMethod === 'paymongo_card' && (
                 <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3">
-                  <span className="text-xs font-bold text-white">Card Payment Details (PayMongo Encrypted)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white">Card Payment Details (PayMongo Test Sandbox)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 font-mono font-bold border border-emerald-800">
+                      Test Cards Ready
+                    </span>
+                  </div>
                   <div className="space-y-2">
                     <input
                       type="text"
@@ -666,8 +663,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 >
                   <Lock className="w-3.5 h-3.5" />
                   <span>
-                    {paymentMethod === 'gcash' && !otpStep 
-                      ? 'Proceed to GCash OTP' 
+                    {paymentMethod === 'gcash'
+                      ? `Pay ₱${total.toLocaleString()} with GCash`
                       : `Authorize & Pay ₱${total.toLocaleString()}`}
                   </span>
                 </button>
