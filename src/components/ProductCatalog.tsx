@@ -29,6 +29,7 @@ interface ProductCatalogProps {
   searchQuery: string;
   selectedCategory: ProductCategory;
   setSelectedCategory: (cat: ProductCategory) => void;
+  onNavigateToSeller?: () => void;
 }
 
 const CATEGORIES: { id: ProductCategory; label: string; icon: string }[] = [
@@ -51,6 +52,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   searchQuery,
   selectedCategory,
   setSelectedCategory,
+  onNavigateToSeller,
 }) => {
   const [maxPrice, setMaxPrice] = useState<number>(6000);
   const [selectedCondition, setSelectedCondition] = useState<string>('all');
@@ -334,26 +336,44 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
           {/* Product Grid (9 of 12 cols) */}
           <div className="lg:col-span-9">
             {filteredProducts.length === 0 ? (
-              <div className="rounded-2xl bg-neutral-900/50 border border-neutral-800 p-12 text-center space-y-4">
-                <div className="w-12 h-12 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center mx-auto">
-                  <Bike className="w-6 h-6" />
+              <div className="rounded-2xl bg-neutral-900/50 border border-neutral-800 p-8 sm:p-12 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-neutral-800/80 border border-neutral-700 text-red-500 flex items-center justify-center mx-auto shadow-inner">
+                  <Bike className="w-7 h-7" />
                 </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white font-['Outfit']">No Matching Motorcycle Parts Found</h3>
-                  <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-                    Try loosening your price filter, clearing the bike model fitment, or searching for general categories like "pulley", "pipe", or "carb".
+                <div className="space-y-1 max-w-md mx-auto">
+                  <h3 className="text-lg font-bold text-white font-['Outfit']">
+                    {products.length === 0 
+                      ? 'Marketplace is Ready for Listings' 
+                      : 'No Matching Motorcycle Parts Found'}
+                  </h3>
+                  <p className="text-xs text-neutral-400 leading-relaxed">
+                    {products.length === 0
+                      ? 'There are currently no active parts listed. As a registered rider or tuner, you can post your motorcycle parts, exhaust systems, and CVT sets for sale!'
+                      : 'Try loosening your price filter, clearing the bike model filter, or searching for general terms like "pulley", "pipe", or "carb".'}
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setSelectedBike(null);
-                    setSelectedCategory('all');
-                    setMaxPrice(6000);
-                  }}
-                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors"
-                >
-                  Clear Filters & Show All Parts
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  {onNavigateToSeller && (
+                    <button
+                      onClick={onNavigateToSeller}
+                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-all shadow-lg shadow-red-600/30 flex items-center gap-1.5"
+                    >
+                      <span>+ Post a Part for Sale</span>
+                    </button>
+                  )}
+                  {products.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setSelectedBike(null);
+                        setSelectedCategory('all');
+                        setMaxPrice(6000);
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold border border-neutral-700 transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5">

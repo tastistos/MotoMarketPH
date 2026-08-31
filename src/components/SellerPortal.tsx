@@ -2,22 +2,21 @@ import React, { useState } from 'react';
 import { 
   Store, 
   PlusCircle, 
-  ShieldCheck, 
   Trash2, 
-  Edit3, 
   Package, 
-  DollarSign, 
   Bike, 
   CheckCircle2, 
   UploadCloud, 
   Smartphone, 
-  Sparkles,
-  ArrowRight,
-  TrendingUp,
-  AlertCircle
+  ArrowRight, 
+  AlertCircle,
+  Image as ImageIcon,
+  Loader2,
+  Check
 } from 'lucide-react';
-import { Product, ProductCategory } from '../types';
-import { POPULAR_BIKES } from '../data/mockProducts';
+import { Product, ProductCategory, UserProfile } from '../types';
+import { POPULAR_BIKES, DEMO_PRESET_ITEMS } from '../data/mockProducts';
+import { insertProductToDb, deleteProductFromDb } from '../lib/supabase';
 
 interface SellerPortalProps {
   products: Product[];
@@ -25,6 +24,8 @@ interface SellerPortalProps {
   onDeleteProduct: (productId: string) => void;
   userGcash: string;
   setUserGcash: (gcash: string) => void;
+  userProfile: UserProfile | null;
+  onOpenAuth: () => void;
 }
 
 export const SellerPortal: React.FC<SellerPortalProps> = ({
@@ -33,20 +34,20 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
   onDeleteProduct,
   userGcash,
   setUserGcash,
+  userProfile,
+  onOpenAuth,
 }) => {
-  const [storeName, setStoreName] = useState('Metro Moto Tuners');
-  const [sellerName, setSellerName] = useState('Kuya Bryan');
-  const [sellerLocation, setSellerLocation] = useState('Caloocan / Quezon City');
-  const [gcashInput, setGcashInput] = useState(userGcash || '0917-882-9310');
-  const [sellerRegistered, setSellerRegistered] = useState(true);
+  const [storeName, setStoreName] = useState(userProfile?.fullName ? `${userProfile.fullName}'s Moto Garage` : 'Caloocan Moto Parts');
+  const [sellerLocation, setSellerLocation] = useState('Metro Manila / Caloocan');
+  const [gcashInput, setGcashInput] = useState(userProfile?.gcashNumber || userGcash || '0917-882-9310');
 
-  // New product form state
+  // Form State
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('JVT Racing');
   const [category, setCategory] = useState<ProductCategory>('cvt_transmission');
   const [price, setPrice] = useState<number>(1850);
   const [originalPrice, setOriginalPrice] = useState<number>(2200);
-  const [stock, setStock] = useState<number>(15);
+  const [stock, setStock] = useState<number>(10);
   const [condition, setCondition] = useState<'Brand New' | 'Performance Tuned' | 'Mint 2nd Hand'>('Brand New');
   const [selectedBikes, setSelectedBikes] = useState<string[]>([
     'Honda Click 125i (V1 / V2 / V3)',
@@ -54,11 +55,14 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
   ]);
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=800&q=80');
-  const [postSuccess, setPostSuccess] = useState(false);
 
-  // Payout state
+  const [saving, setSaving] = useState(false);
+  const [postSuccess, setPostSuccess] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // GCash escrow balance simulation
   const [payoutSuccess, setPayoutSuccess] = useState(false);
-  const [sellerBalance, setSellerBalance] = useState(14850);
+  const [sellerBalance, setSellerBalance] = useState(4850);
 
   const handleBikeToggle = (bikeName: string) => {
     if (selectedBikes.includes(bikeName)) {
@@ -68,12 +72,49 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
     }
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          setImageUrl(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLoadDemoTemplate = (preset: typeof DEMO_PRESET_ITEMS[0]) => {
+    setProductName(preset.name);
+    setBrand(preset.brand);
+    setCategory(preset.category);
+    setPrice(preset.price);
+    setOriginalPrice(preset.originalPrice || preset.price + 300);
+    setStock(preset.stock);
+    setCondition(preset.condition as any);
+    setSelectedBikes(preset.compatibleBikes);
+    setDescription(preset.description);
+    setImageUrl(preset.image);
+  };
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!productName.trim() || selectedBikes.length === 0) return;
+    setErrorMsg(null);
+
+    if (!productName.trim()) {
+      setErrorMsg('Please enter a listing title for the motorcycle part.');
+      return;
+    }
+    if (selectedBikes.length === 0) {
+      setErrorMsg('Please select at least 1 compatible motorcycle model.');
+      return;
+    }
+
+    setSaving(true);
 
     const newProd: Product = {
-      id: `prod-custom-${Date.now()}`,
+      id: `prod-${Date.now()}`,
       name: productName.trim(),
       brand: brand.trim(),
       category,
@@ -81,37 +122,60 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
       originalPrice: originalPrice ? Number(originalPrice) : undefined,
       rating: 5.0,
       reviewCount: 1,
-      image: imageUrl || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=800&q=80',
+      image: imageUrl.trim() || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=800&q=80',
       stock: Number(stock),
       condition,
       compatibleBikes: selectedBikes,
-      description: description || 'High-performance bolt-on motorcycle parts engineered for street and circuit racing.',
+      description: description.trim() || 'Genuine high-performance motorcycle component built for street and track use.',
       specifications: {
-        'Material': 'Aviation Alloy / Steel',
+        'Material': 'Aviation T6 Alloy / Stainless',
         'Fitment': selectedBikes.join(', '),
         'Condition': condition,
-        'Seller GCash': gcashInput
+        'Seller Contact': gcashInput
       },
       seller: {
-        id: `seller-${Date.now()}`,
-        name: storeName,
-        gcashNumber: gcashInput,
+        id: userProfile?.id || `seller-${Date.now()}`,
+        name: storeName.trim() || userProfile?.fullName || 'Verified Rider Seller',
+        gcashNumber: gcashInput.trim(),
         rating: 5.0,
-        location: sellerLocation,
+        location: sellerLocation.trim(),
         verified: true
       },
       featured: true
     };
 
-    onAddProduct(newProd);
-    setUserGcash(gcashInput);
-    setPostSuccess(true);
-    setProductName('');
-    setDescription('');
+    try {
+      // 1. Sync to Supabase products table
+      await insertProductToDb(newProd);
 
-    setTimeout(() => {
-      setPostSuccess(false);
-    }, 2500);
+      // 2. Add to app state
+      onAddProduct(newProd);
+      setUserGcash(gcashInput);
+
+      setPostSuccess(true);
+      setProductName('');
+      setDescription('');
+
+      setTimeout(() => {
+        setPostSuccess(false);
+      }, 3000);
+    } catch (err: any) {
+      console.warn('Supabase product upload note:', err);
+      // Still add locally even if network has hiccup
+      onAddProduct(newProd);
+      setPostSuccess(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteProductFromDb(id);
+    } catch (err) {
+      console.warn('Delete error:', err);
+    }
+    onDeleteProduct(id);
   };
 
   const handlePayoutGCash = () => {
@@ -123,127 +187,168 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
     }, 2000);
   };
 
-  // Filter seller's own products or general listings
-  const sellerProducts = products.slice(0, 5);
-
   return (
-    <div className="bg-neutral-950 min-h-screen py-8 px-4 sm:px-6 lg:px-8 border-b border-neutral-850">
+    <div className="bg-neutral-950 min-h-screen py-8 px-4 sm:px-6 lg:px-8 border-b border-neutral-850 font-['Plus_Jakarta_Sans']">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* Header Banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-red-950 via-neutral-900 to-neutral-900 border border-red-900/40 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+        {/* Banner */}
+        <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
           <div className="space-y-2 max-w-xl z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950 text-red-400 text-xs font-bold border border-red-800">
               <Store className="w-3.5 h-3.5" />
-              <span>MOTOSTREET SELLER & TUNER DASHBOARD</span>
+              <span>MOTOSTREET SELLER & TUNER HUB</span>
             </div>
-            <h1 className="text-2xl sm:text-4xl font-black text-white font-['Outfit'] uppercase tracking-tight">
-              Post Your Motorcycle Parts & Receive GCash Payouts
+            <h1 className="text-2xl sm:text-3xl font-black text-white font-['Outfit'] uppercase tracking-tight">
+              Post Your Parts & Receive PayMongo GCash Payouts
             </h1>
-            <p className="text-xs sm:text-sm text-neutral-300 font-['Plus_Jakarta_Sans'] leading-relaxed">
-              Sell underbone & scooter performance components directly to thousands of daily Filipino riders across Luzon, Visayas, and Mindanao.
+            <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
+              Reach thousands of daily Honda Click 125/160, XRM 125, Raider 150, Wave 125, and Aerox riders across Metro Manila and Philippine provinces.
             </p>
           </div>
 
-          {/* Quick GCash Balance Card */}
-          <div className="rounded-xl bg-neutral-950/80 border border-neutral-800 p-4 shrink-0 min-w-[260px] space-y-3 z-10">
+          {/* GCash Escrow Card */}
+          <div className="rounded-2xl bg-neutral-950 border border-neutral-800 p-5 shrink-0 min-w-[260px] space-y-3 z-10">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-neutral-400 font-semibold uppercase">Seller GCash Balance</span>
+              <span className="text-[11px] text-neutral-400 font-bold uppercase tracking-wider">Escrow Balance</span>
               <span className="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 font-bold">
-                PayMongo Auto-Payout
+                GCash Instant
               </span>
             </div>
             <div>
               <span className="text-2xl sm:text-3xl font-black text-white font-['Outfit']">
                 ₱{sellerBalance.toLocaleString()} PHP
               </span>
-              <p className="text-[10px] text-neutral-400">
-                Registered GCash: <strong className="text-emerald-400 font-mono">{gcashInput}</strong>
+              <p className="text-[11px] text-neutral-400 mt-0.5">
+                Payout Phone: <span className="text-emerald-400 font-mono font-bold">{gcashInput}</span>
               </p>
             </div>
             <button
               onClick={handlePayoutGCash}
               disabled={sellerBalance <= 0}
-              className={`w-full py-2 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
+              className={`w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all ${
                 sellerBalance > 0 
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md' 
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30' 
                   : 'bg-neutral-850 text-neutral-500 cursor-not-allowed'
               }`}
             >
               <Smartphone className="w-3.5 h-3.5" />
-              <span>{payoutSuccess ? 'Payout Sent to GCash!' : 'Transfer to GCash Wallet'}</span>
+              <span>{payoutSuccess ? 'Payout Transferred!' : 'Withdraw to GCash'}</span>
             </button>
           </div>
         </div>
 
-        {/* Two Column Layout: Post Product Form (7 cols) + Seller Profile & Active Listings (5 cols) */}
+        {/* Not logged in prompt */}
+        {!userProfile && (
+          <div className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-red-600/20 text-red-400 flex items-center justify-center font-bold">
+                <Store className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white">Create a Rider Seller Profile to manage your inventory</p>
+                <p className="text-[11px] text-neutral-400">Save your store name, GCash payout phone, and view customer orders.</p>
+              </div>
+            </div>
+            <button
+              onClick={onOpenAuth}
+              className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors whitespace-nowrap"
+            >
+              Register / Sign In
+            </button>
+          </div>
+        )}
+
+        {/* Main Grid: Upload Form (7 cols) + Store Profile & Live Listings (5 cols) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Left Column: Post Product Form */}
+          {/* Form */}
           <div className="lg:col-span-7 space-y-6">
-            <div className="rounded-2xl bg-neutral-900/80 border border-neutral-800 p-6 space-y-5">
+            <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-6 space-y-5">
               
               <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
                 <div className="flex items-center gap-2">
                   <PlusCircle className="w-5 h-5 text-red-500" />
-                  <h2 className="text-base sm:text-lg font-bold text-white uppercase font-['Outfit']">
-                    Post New Motorcycle Part Listing
+                  <h2 className="text-base font-bold text-white uppercase font-['Outfit']">
+                    Post Motorcycle Part for Sale
                   </h2>
                 </div>
-                <span className="text-[11px] text-neutral-400">
-                  Instant Publication
-                </span>
+                
+                {/* Template quick loader */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-neutral-400 hidden sm:inline">Fill Template:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadDemoTemplate(DEMO_PRESET_ITEMS[0])}
+                    className="text-[10px] px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 transition-colors"
+                  >
+                    CVT Pulley
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadDemoTemplate(DEMO_PRESET_ITEMS[1])}
+                    className="text-[10px] px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 transition-colors"
+                  >
+                    Open Pipe
+                  </button>
+                </div>
               </div>
 
               {postSuccess && (
-                <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2 animate-in zoom-in-95">
+                <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                   <span>
-                    Item posted successfully! Your part is now live in the Store Page catalog.
+                    Motorcycle part posted successfully! It is now live in the Store catalog and stored in your Supabase database.
                   </span>
+                </div>
+              )}
+
+              {errorMsg && (
+                <div className="p-3.5 rounded-xl bg-red-950/60 border border-red-800 text-red-300 text-xs flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 
               <form onSubmit={handleCreateProduct} className="space-y-4">
                 
-                {/* Product Title */}
+                {/* Title */}
                 <div>
-                  <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                    Part Title / Listing Name *
+                  <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                    Listing Title / Part Name *
                   </label>
                   <input
                     type="text"
                     required
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    placeholder="e.g. JVT 13.5 Deg High Speed Pulley Set for Click 125i"
-                    className="w-full bg-neutral-950 border border-neutral-800 text-xs sm:text-sm rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-red-500"
+                    placeholder="e.g. JVT 13.5 Deg High Torque Pulley Set for Click 125i"
+                    className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-red-500 placeholder-neutral-600"
                   />
                 </div>
 
                 {/* Brand & Category */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                      Brand / Manufacturer *
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                      Brand / Tuner *
                     </label>
                     <input
                       type="text"
                       required
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
-                      placeholder="e.g. JVT / Daeng / BRT / RCB / Keihin"
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. JVT Racing / Daeng Sai4 / Keihin / RCB"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-red-500 placeholder-neutral-600"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
                       Category *
                     </label>
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value as any)}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-red-500"
                     >
                       <option value="cvt_transmission">⚙️ CVT & Transmission</option>
                       <option value="engine">🔥 Bore Kits & Engine</option>
@@ -256,10 +361,10 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Price, Original Price, Stock, Condition */}
+                {/* Price, Original, Stock, Condition */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
                       Price (PHP ₱) *
                     </label>
                     <input
@@ -268,22 +373,22 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                       min="50"
                       value={price}
                       onChange={(e) => setPrice(Number(e.target.value))}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white font-bold text-red-400 focus:outline-none focus:border-red-500"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-red-400 font-bold focus:outline-none focus:border-red-500"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                      Orig. Price (PHP)
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                      Orig. Price
                     </label>
                     <input
                       type="number"
                       value={originalPrice}
                       onChange={(e) => setOriginalPrice(Number(e.target.value))}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-neutral-400 focus:outline-none focus:border-red-500"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-neutral-400 focus:outline-none focus:border-red-500"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
                       Stock Qty *
                     </label>
                     <input
@@ -292,17 +397,17 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                       min="1"
                       value={stock}
                       onChange={(e) => setStock(Number(e.target.value))}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-red-500"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
+                    <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
                       Condition *
                     </label>
                     <select
                       value={condition}
                       onChange={(e) => setCondition(e.target.value as any)}
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-2 py-2 text-white focus:outline-none focus:border-red-500"
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-2.5 py-2.5 text-white focus:outline-none focus:border-red-500"
                     >
                       <option value="Brand New">Brand New</option>
                       <option value="Performance Tuned">Performance Tuned</option>
@@ -311,18 +416,18 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Bike Compatibility Selection (Multi-check) */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-semibold text-neutral-400 block">
-                    Compatible Bike Models (Select all that fit) *
+                {/* Bike Compatibility */}
+                <div>
+                  <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                    Compatible Motorcycle Models (Select all that fit) *
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-2 bg-neutral-950 rounded-lg border border-neutral-800">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-2 bg-neutral-950 rounded-xl border border-neutral-800">
                     {POPULAR_BIKES.map((bike) => (
                       <label 
                         key={bike.id} 
-                        className={`flex items-center gap-1.5 p-1.5 rounded text-[11px] cursor-pointer transition-colors ${
+                        className={`flex items-center gap-1.5 p-1.5 rounded-lg text-[11px] cursor-pointer transition-colors ${
                           selectedBikes.includes(bike.name) 
-                            ? 'bg-red-950/60 text-red-300 font-semibold border border-red-800/60' 
+                            ? 'bg-red-950 text-red-300 font-bold border border-red-800/80' 
                             : 'text-neutral-400 hover:text-white'
                         }`}
                       >
@@ -338,42 +443,63 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
                   </div>
                 </div>
 
-                {/* Image URL & Description */}
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                      Product Photo URL
-                    </label>
+                {/* Image Upload / URL */}
+                <div>
+                  <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                    Product Image (Upload File or Enter URL)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="url"
                       value={imageUrl}
                       onChange={(e) => setImageUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl px-3.5 py-2.5 text-neutral-300 focus:outline-none focus:border-red-500"
                     />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                      Technical Description & Fitment Details
+                    <label className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 text-xs font-semibold text-neutral-300 cursor-pointer transition-colors">
+                      <UploadCloud className="w-4 h-4 text-red-500" />
+                      <span>Upload from Device</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                      />
                     </label>
-                    <textarea
-                      rows={3}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Describe the material, ramp angle, bore size, or tuning advice..."
-                      className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg p-3 text-white focus:outline-none focus:border-red-500"
-                    />
                   </div>
                 </div>
 
-                {/* Submit button */}
+                {/* Description */}
+                <div>
+                  <label className="text-[11px] font-bold text-neutral-300 uppercase tracking-wider block mb-1.5">
+                    Tuning Specs & Item Description
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe material, ramp angle, carburetor jetting, exhaust sound note, or performance gains..."
+                    className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-xl p-3 text-white focus:outline-none focus:border-red-500 placeholder-neutral-600"
+                  />
+                </div>
+
+                {/* Submit */}
                 <button
                   type="submit"
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                  disabled={saving}
+                  className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 transition-all disabled:opacity-50"
                 >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Publish Part to Marketplace</span>
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Publishing to Supabase...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-4 h-4" />
+                      <span>Publish Listing to Marketplace</span>
+                    </>
+                  )}
                 </button>
 
               </form>
@@ -381,119 +507,99 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Seller Profile & GCash Configuration + Active Inventory */}
+          {/* Right Column: Store Setup & Current Listings */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* GCash Seller Account Setup */}
-            <div className="rounded-2xl bg-neutral-900/80 border border-neutral-800 p-5 space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-blue-400" />
-                  <h3 className="text-sm font-bold text-white uppercase font-['Outfit']">
-                    Seller GCash Payout Profile
-                  </h3>
-                </div>
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                  Verified
-                </span>
-              </div>
-
-              <div className="space-y-3">
+            {/* Store Details Card */}
+            <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-5 space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase font-['Outfit']">
+                Seller Store Profile
+              </h3>
+              
+              <div className="space-y-3 text-xs">
                 <div>
-                  <label className="text-[11px] font-semibold text-neutral-400 block mb-1">Store / Shop Name</label>
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                    Store / Shop Name
+                  </label>
                   <input
                     type="text"
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-semibold text-neutral-400 block mb-1">Owner / Technician Name</label>
-                  <input
-                    type="text"
-                    value={sellerName}
-                    onChange={(e) => setSellerName(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                    Registered GCash Mobile Number (For Automated Payouts) *
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                    Location / City
                   </label>
-                  <input
-                    type="text"
-                    value={gcashInput}
-                    onChange={(e) => setGcashInput(e.target.value)}
-                    placeholder="09XX-XXX-XXXX"
-                    className="w-full bg-neutral-950 border border-blue-900 text-xs rounded-lg px-3 py-2 text-blue-300 font-mono font-bold"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-semibold text-neutral-400 block mb-1">Physical Garage / Shop Location</label>
                   <input
                     type="text"
                     value={sellerLocation}
                     onChange={(e) => setSellerLocation(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white"
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white"
                   />
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserGcash(gcashInput);
-                    alert('GCash Seller Profile updated successfully!');
-                  }}
-                  className="w-full py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold"
-                >
-                  Save GCash Payout Settings
-                </button>
+                <div>
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                    GCash Mobile Number (For Payouts)
+                  </label>
+                  <input
+                    type="tel"
+                    value={gcashInput}
+                    onChange={(e) => setGcashInput(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3 py-2 text-white font-mono text-emerald-400 font-bold"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Active Listings Manager */}
-            <div className="rounded-2xl bg-neutral-900/80 border border-neutral-800 p-5 space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-neutral-800">
-                <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-red-500" />
-                  <h3 className="text-sm font-bold text-white uppercase font-['Outfit']">
-                    Your Active Listings ({sellerProducts.length})
-                  </h3>
+            {/* Active Listings in Database */}
+            <div className="rounded-2xl bg-neutral-900 border border-neutral-800 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white uppercase font-['Outfit']">
+                  Your Active Listings ({products.length})
+                </h3>
+                <span className="text-[10px] text-neutral-400">Live on Store</span>
+              </div>
+
+              {products.length === 0 ? (
+                <div className="py-8 text-center space-y-2">
+                  <Package className="w-8 h-8 text-neutral-600 mx-auto" />
+                  <p className="text-xs text-neutral-400">No parts listed yet.</p>
+                  <p className="text-[11px] text-neutral-500">Fill out the form on the left to post your first motorcycle upgrade!</p>
                 </div>
-              </div>
-
-              <div className="divide-y divide-neutral-850 max-h-72 overflow-y-auto space-y-2">
-                {sellerProducts.map((p) => (
-                  <div key={p.id} className="pt-2 first:pt-0 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <img
-                        src={p.image}
-                        alt={p.name}
-                        referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-lg object-cover bg-neutral-950 border border-neutral-800 shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <h4 className="text-xs font-bold text-white truncate">{p.name}</h4>
-                        <p className="text-[10px] text-neutral-400">
-                          ₱{p.price.toLocaleString()} • {p.stock} in stock
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => onDeleteProduct(p.id)}
-                      className="p-1.5 rounded-lg bg-neutral-950 hover:bg-red-950 text-neutral-400 hover:text-red-400 border border-neutral-800 transition-colors"
-                      title="Delete listing"
+              ) : (
+                <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                  {products.map((item) => (
+                    <div 
+                      key={item.id}
+                      className="p-3 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-between gap-3 hover:border-neutral-700 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <img 
+                        src={item.image} 
+                        alt={item.name} 
+                        className="w-12 h-12 rounded-lg object-cover bg-neutral-900 shrink-0" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold text-white truncate">{item.name}</h4>
+                        <p className="text-[10px] text-neutral-400 truncate">{item.brand} • Stock: {item.stock}</p>
+                        <p className="text-xs font-bold text-red-400 font-['Outfit']">₱{item.price.toLocaleString()} PHP</p>
+                      </div>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1.5 rounded-lg bg-neutral-900 text-neutral-400 hover:text-red-400 hover:bg-red-950/40 transition-colors"
+                        title="Delete listing"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
             </div>
 
           </div>

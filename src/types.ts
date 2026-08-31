@@ -120,6 +120,23 @@ export interface SellerProfile {
   listedProductsCount: number;
 }
 
+export interface UserProfile {
+  id: string;
+  email?: string;
+  fullName: string;
+  phone?: string;
+  gcashNumber?: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  primaryBike: string;
+  avatarUrl?: string;
+  isSeller: boolean;
+  createdAt?: string;
+}
+
+export type AuthMode = 'login' | 'register' | 'forgot_password';
+
 export type NavTab = 'home' | 'store' | 'seller' | 'dashboard' | 'about' | 'contact';
 
 export interface ChatMessage {
