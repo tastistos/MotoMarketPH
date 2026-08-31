@@ -18,7 +18,7 @@ import {
   Gauge,
   Zap
 } from 'lucide-react';
-import { Product, ProductCategory, BikeModel, UserProfile } from '../types';
+import { Product, ProductCategory, BikeModel, UserProfile, ProductReview } from '../types';
 import { POPULAR_BIKES } from '../data/mockProducts';
 
 interface ProductCatalogProps {
@@ -34,6 +34,7 @@ interface ProductCatalogProps {
   onNavigateToSeller?: () => void;
   userProfile?: UserProfile | null;
   onOpenAuth?: () => void;
+  reviews?: ProductReview[];
 }
 
 const CATEGORIES: { id: ProductCategory; label: string; icon: string }[] = [
@@ -60,6 +61,7 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   onNavigateToSeller,
   userProfile,
   onOpenAuth,
+  reviews = [],
 }) => {
   const [maxPrice, setMaxPrice] = useState<number>(6000);
   const [selectedCondition, setSelectedCondition] = useState<string>('all');
@@ -389,6 +391,12 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
                     : 0;
 
+                  const prodReviews = reviews.filter(r => r.productId === product.id);
+                  const displayRating = prodReviews.length > 0
+                    ? (prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1)
+                    : (product.rating ? product.rating.toFixed(1) : '5.0');
+                  const displayReviewCount = prodReviews.length > 0 ? prodReviews.length : (product.reviewCount || 0);
+
                   return (
                     <div
                       key={product.id}
@@ -446,8 +454,8 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                             </span>
                             <div className="flex items-center gap-1 text-amber-400 font-bold text-[11px]">
                               <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span>{product.rating.toFixed(1)}</span>
-                              <span className="text-neutral-500 font-normal">({product.reviewCount})</span>
+                              <span>{displayRating}</span>
+                              <span className="text-neutral-500 font-normal">({displayReviewCount})</span>
                             </div>
                           </div>
 

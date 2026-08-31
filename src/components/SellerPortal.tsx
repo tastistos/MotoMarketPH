@@ -125,7 +125,7 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
       price: Number(price),
       originalPrice: originalPrice ? Number(originalPrice) : undefined,
       rating: 5.0,
-      reviewCount: 1,
+      reviewCount: 0,
       image: imageUrl.trim() || 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=800&q=80',
       stock: Number(stock),
       condition,

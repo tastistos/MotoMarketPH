@@ -378,30 +378,42 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <form onSubmit={handleSubmitReview} className="space-y-3">
                     {/* Star Selector */}
                     <div>
-                      <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                        Your Rating:
+                      <label className="text-[11px] font-semibold text-neutral-400 block mb-1.5">
+                        Your Rating (Click to Select):
                       </label>
-                      <div className="flex items-center gap-1.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => setStarRating(star)}
-                            onMouseEnter={() => setHoverRating(star)}
-                            onMouseLeave={() => setHoverRating(0)}
-                            className="p-1 text-neutral-600 hover:scale-110 transition-transform"
-                          >
-                            <Star 
-                              className={`w-6 h-6 ${
-                                (hoverRating || starRating) >= star 
-                                  ? 'fill-amber-400 text-amber-400' 
-                                  : 'text-neutral-700'
-                              }`} 
-                            />
-                          </button>
-                        ))}
-                        <span className="text-xs font-bold text-amber-400 ml-2">
-                          {hoverRating || starRating} of 5 Stars ({starRating === 5 ? 'Excellent 🚀' : starRating >= 4 ? 'Great 👍' : 'Average'})
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-1 bg-neutral-950 p-1.5 rounded-xl border border-neutral-800">
+                          {[1, 2, 3, 4, 5].map((star) => {
+                            const isFilled = (hoverRating || starRating) >= star;
+                            return (
+                              <button
+                                key={star}
+                                id={`rating-star-btn-${star}`}
+                                type="button"
+                                onClick={() => setStarRating(star)}
+                                onMouseEnter={() => setHoverRating(star)}
+                                onMouseLeave={() => setHoverRating(0)}
+                                aria-label={`${star} Stars`}
+                                className="p-1 rounded-lg hover:bg-neutral-850 hover:scale-110 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <Star 
+                                  className={`w-6 h-6 transition-colors ${
+                                    isFilled 
+                                      ? 'fill-amber-400 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.3)]' 
+                                      : 'text-neutral-700 hover:text-neutral-500'
+                                  }`} 
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-800 text-amber-400">
+                          {hoverRating || starRating} / 5 Stars • {
+                            (hoverRating || starRating) === 5 ? '5.0 Excellent 🚀' :
+                            (hoverRating || starRating) === 4 ? '4.0 Very Good 👍' :
+                            (hoverRating || starRating) === 3 ? '3.0 Good 👌' :
+                            (hoverRating || starRating) === 2 ? '2.0 Fair ⚠️' : '1.0 Poor 👎'
+                          }
                         </span>
                       </div>
                     </div>

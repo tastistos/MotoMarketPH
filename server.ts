@@ -373,7 +373,24 @@ app.post('/api/reviews', (req, res) => {
     if (!review || !review.id) {
       return res.status(400).json({ error: 'Review with id is required' });
     }
-    store.reviews.unshift({ ...review, createdAt: new Date().toISOString() });
+    const existingIndex = store.reviews.findIndex(r => r.id === review.id);
+    if (existingIndex >= 0) {
+      store.reviews[existingIndex] = { ...store.reviews[existingIndex], ...review };
+    } else {
+      store.reviews.unshift({ ...review, createdAt: review.createdAt || new Date().toISOString() });
+    }
+
+    // Recalculate rating & reviewCount for the product on server store
+    const productReviews = store.reviews.filter(r => r.productId === review.productId);
+    if (productReviews.length > 0) {
+      const avg = productReviews.reduce((sum, r) => sum + Number(r.rating || 5), 0) / productReviews.length;
+      const prodIndex = store.products.findIndex(p => p.id === review.productId);
+      if (prodIndex >= 0) {
+        store.products[prodIndex].rating = Number(avg.toFixed(1));
+        store.products[prodIndex].reviewCount = productReviews.length;
+      }
+    }
+
     saveStore();
     return res.json({ success: true, review });
   } catch (err: any) {

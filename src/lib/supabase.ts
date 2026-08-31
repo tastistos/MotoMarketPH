@@ -498,7 +498,7 @@ export async function fetchReviewsFromDb(productId?: string): Promise<ProductRev
   return Array.from(reviewsMap.values());
 }
 
-export async function insertReviewToDb(review: ProductReview): Promise<boolean> {
+export async function insertReviewToDb(review: ProductReview, newRating?: number, newReviewCount?: number): Promise<boolean> {
   try {
     // 1. Save to server API
     try {
@@ -511,7 +511,7 @@ export async function insertReviewToDb(review: ProductReview): Promise<boolean> 
       console.warn('Server save review error:', e);
     }
 
-    // 2. Save to Supabase
+    // 2. Save to Supabase reviews table
     const payload = {
       id: review.id,
       product_id: review.productId,
@@ -532,6 +532,22 @@ export async function insertReviewToDb(review: ProductReview): Promise<boolean> 
       console.warn('Supabase insert review note:', error.message);
       await supabase.from('reviews').insert([payload]);
     }
+
+    // 3. Update products table with recalculated rating and review count
+    if (typeof newRating === 'number' && typeof newReviewCount === 'number') {
+      try {
+        await supabase
+          .from('products')
+          .update({
+            rating: newRating,
+            review_count: newReviewCount,
+          })
+          .eq('id', review.productId);
+      } catch (prodErr) {
+        console.warn('Supabase product rating update note:', prodErr);
+      }
+    }
+
     return true;
   } catch (err) {
     console.warn('insertReviewToDb exception:', err);

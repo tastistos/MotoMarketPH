@@ -359,29 +359,47 @@ export default function App() {
       date: 'Today'
     };
 
-    try {
-      await insertReviewToDb(newRev);
-    } catch (err) {
-      console.warn('Review database sync:', err);
-    }
+    // Calculate updated reviews and new average rating
+    const otherReviews = reviews.filter(r => r.productId === newReviewData.productId);
+    const prodReviews = [newRev, ...otherReviews];
+    const newAvg = Number((prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length).toFixed(1));
+    const newCount = prodReviews.length;
 
-    setReviews(prev => [newRev, ...prev]);
+    // 1. Update reviews state immediately
+    setReviews(prev => [newRev, ...prev.filter(r => r.id !== newRev.id)]);
 
-    // Update product average rating
+    // 2. Update products state
     setProducts(prev => prev.map(prod => {
       if (prod.id === newReviewData.productId) {
-        const prodReviews = [...reviews.filter(r => r.productId === prod.id), newRev];
-        const avg = prodReviews.reduce((sum, r) => sum + r.rating, 0) / prodReviews.length;
         return {
           ...prod,
-          rating: Number(avg.toFixed(1)),
-          reviewCount: prodReviews.length
+          rating: newAvg,
+          reviewCount: newCount
         };
       }
       return prod;
     }));
 
-    showToast('Verified rider review and star rating submitted!');
+    // 3. Keep selectedProduct in sync so open modal updates its rating immediately
+    setSelectedProduct(prev => {
+      if (prev && prev.id === newReviewData.productId) {
+        return {
+          ...prev,
+          rating: newAvg,
+          reviewCount: newCount
+        };
+      }
+      return prev;
+    });
+
+    showToast(`⭐ ${newReviewData.rating}-Star review submitted! Product rating updated to ${newAvg}★`);
+
+    // 4. Persist review and updated rating to server and Supabase
+    try {
+      await insertReviewToDb(newRev, newAvg, newCount);
+    } catch (err) {
+      console.warn('Review database sync:', err);
+    }
   };
 
   // Order Placement
@@ -470,6 +488,7 @@ export default function App() {
             {/* Store Preview */}
             <ProductCatalog
               products={products}
+              reviews={reviews}
               onSelectProduct={(p) => setSelectedProduct(p)}
               onAddToCart={handleAddToCart}
               onDirectBuy={handleDirectBuy}
@@ -488,6 +507,7 @@ export default function App() {
         {currentTab === 'store' && (
           <ProductCatalog
             products={products}
+            reviews={reviews}
             onSelectProduct={(p) => setSelectedProduct(p)}
             onAddToCart={handleAddToCart}
             onDirectBuy={handleDirectBuy}
