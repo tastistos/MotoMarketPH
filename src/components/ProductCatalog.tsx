@@ -15,21 +15,25 @@ import {
   Fuel,
   Volume2,
   Cpu,
-  Gauge
+  Gauge,
+  Zap
 } from 'lucide-react';
-import { Product, ProductCategory, BikeModel } from '../types';
+import { Product, ProductCategory, BikeModel, UserProfile } from '../types';
 import { POPULAR_BIKES } from '../data/mockProducts';
 
 interface ProductCatalogProps {
   products: Product[];
   onSelectProduct: (product: Product) => void;
   onAddToCart: (product: Product, quantity?: number) => void;
+  onDirectBuy?: (product: Product) => void;
   selectedBike: BikeModel | null;
   setSelectedBike: (bike: BikeModel | null) => void;
   searchQuery: string;
   selectedCategory: ProductCategory;
   setSelectedCategory: (cat: ProductCategory) => void;
   onNavigateToSeller?: () => void;
+  userProfile?: UserProfile | null;
+  onOpenAuth?: () => void;
 }
 
 const CATEGORIES: { id: ProductCategory; label: string; icon: string }[] = [
@@ -47,12 +51,15 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
   products,
   onSelectProduct,
   onAddToCart,
+  onDirectBuy,
   selectedBike,
   setSelectedBike,
   searchQuery,
   selectedCategory,
   setSelectedCategory,
   onNavigateToSeller,
+  userProfile,
+  onOpenAuth,
 }) => {
   const [maxPrice, setMaxPrice] = useState<number>(6000);
   const [selectedCondition, setSelectedCondition] = useState<string>('all');
@@ -490,20 +497,44 @@ export const ProductCatalog: React.FC<ProductCatalogProps> = ({
                           </div>
 
                           {/* Action Buttons */}
-                          <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div className="space-y-1.5 pt-1">
                             <button
-                              onClick={() => onSelectProduct(product)}
-                              className="w-full py-2 rounded-lg bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 text-xs font-semibold transition-colors"
+                              onClick={() => {
+                                if (!userProfile && onOpenAuth) {
+                                  onOpenAuth();
+                                } else if (onDirectBuy) {
+                                  onDirectBuy(product);
+                                } else {
+                                  onAddToCart(product, 1);
+                                }
+                              }}
+                              className="w-full py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-red-600/30 active:scale-95 transition-all"
                             >
-                              Reviews & Fit
+                              <Zap className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                              <span>⚡ Buy Now (Checkout)</span>
                             </button>
-                            <button
-                              onClick={() => onAddToCart(product, 1)}
-                              className="w-full py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold flex items-center justify-center gap-1 shadow-md shadow-red-600/20 active:scale-95 transition-all"
-                            >
-                              <ShoppingCart className="w-3.5 h-3.5" />
-                              <span>Add to Cart</span>
-                            </button>
+
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                onClick={() => onSelectProduct(product)}
+                                className="w-full py-1.5 rounded-lg bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 text-[11px] font-semibold transition-colors text-center"
+                              >
+                                Specs & Reviews
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!userProfile && onOpenAuth) {
+                                    onOpenAuth();
+                                  } else {
+                                    onAddToCart(product, 1);
+                                  }
+                                }}
+                                className="w-full py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-100 text-[11px] font-bold flex items-center justify-center gap-1 border border-neutral-700 transition-colors"
+                              >
+                                <ShoppingCart className="w-3 h-3 text-red-400" />
+                                <span>Add to Cart</span>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Star, 
@@ -12,24 +12,33 @@ import {
   Sparkles,
   ChevronRight,
   Send,
-  UserCheck
+  UserCheck,
+  Zap,
+  Lock,
+  LogIn
 } from 'lucide-react';
-import { Product, ProductReview } from '../types';
+import { Product, ProductReview, UserProfile } from '../types';
 
 interface ProductDetailModalProps {
   product: Product | null;
   onClose: () => void;
   onAddToCart: (product: Product, quantity: number) => void;
+  onDirectBuy?: (product: Product, quantity: number) => void;
   reviews: ProductReview[];
   onAddReview: (review: Omit<ProductReview, 'id' | 'date'>) => void;
+  userProfile?: UserProfile | null;
+  onOpenAuth?: () => void;
 }
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
   onAddToCart,
+  onDirectBuy,
   reviews,
   onAddReview,
+  userProfile,
+  onOpenAuth,
 }) => {
   if (!product) return null;
 
@@ -37,12 +46,21 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [activeTab, setActiveTab] = useState<'specs' | 'reviews' | 'fitment'>('specs');
   
   // Review form state
-  const [reviewerName, setReviewerName] = useState('');
-  const [reviewBike, setReviewBike] = useState('Honda Click 125i');
+  const [reviewerName, setReviewerName] = useState(userProfile?.fullName || '');
+  const [reviewBike, setReviewBike] = useState(userProfile?.primaryBike || 'Honda Click 125i (V1 / V2 / V3)');
   const [starRating, setStarRating] = useState(5);
   const [hoverRating, setHoverRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
+
+  useEffect(() => {
+    if (userProfile?.fullName) {
+      setReviewerName(userProfile.fullName);
+    }
+    if (userProfile?.primaryBike) {
+      setReviewBike(userProfile.primaryBike);
+    }
+  }, [userProfile]);
 
   const productReviews = reviews.filter(r => r.productId === product.id);
   const averageRating = productReviews.length > 0
@@ -51,14 +69,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userProfile && onOpenAuth) {
+      onOpenAuth();
+      return;
+    }
     if (!reviewerName.trim() || !reviewComment.trim()) return;
 
     onAddReview({
       productId: product.id,
-      userName: reviewerName.trim(),
+      userName: reviewerName.trim() || userProfile?.fullName || 'Verified Rider',
       rating: starRating,
       comment: reviewComment.trim(),
-      bikeModel: reviewBike.trim() || 'Motorcycle',
+      bikeModel: reviewBike.trim() || userProfile?.primaryBike || 'Motorcycle',
       verifiedPurchase: true,
     });
 
@@ -68,6 +90,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       setReviewSubmitted(false);
       setActiveTab('reviews');
     }, 1500);
+  };
+
+  const handleBuyNowClick = () => {
+    if (!userProfile && onOpenAuth) {
+      onOpenAuth();
+      return;
+    }
+    if (onDirectBuy) {
+      onDirectBuy(product, quantity);
+      onClose();
+    } else {
+      onAddToCart(product, quantity);
+      onClose();
+    }
+  };
+
+  const handleAddToCartClick = () => {
+    if (!userProfile && onOpenAuth) {
+      onOpenAuth();
+      return;
+    }
+    onAddToCart(product, quantity);
+    onClose();
   };
 
   return (
@@ -206,20 +251,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <button
-                  onClick={() => {
-                    onAddToCart(product, quantity);
-                    onClose();
-                  }}
-                  className="py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 transition-all"
+                  onClick={handleBuyNowClick}
+                  className="py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:from-red-500 hover:to-rose-500 text-white font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 transition-all"
                 >
-                  <ShoppingCart className="w-4 h-4" />
-                  <span>Add to Cart (₱{(product.price * quantity).toLocaleString()})</span>
+                  <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
+                  <span>⚡ Buy Now (₱{(product.price * quantity).toLocaleString()})</span>
                 </button>
 
-                <div className="flex items-center justify-center gap-2 text-xs text-neutral-400 bg-neutral-900/60 rounded-xl px-3 border border-neutral-800">
-                  <Truck className="w-4 h-4 text-cyan-400" />
-                  <span>PayMongo / GCash Protected</span>
-                </div>
+                <button
+                  onClick={handleAddToCartClick}
+                  className="py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-850 text-white border border-neutral-700 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <ShoppingCart className="w-4 h-4 text-red-400" />
+                  <span>Add to Cart</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-xs text-neutral-400 bg-neutral-900/60 rounded-xl px-3 py-2 border border-neutral-800">
+                <Truck className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Fast Metro Manila & Province Delivery • GCash / PayMongo Protected</span>
               </div>
             </div>
 
@@ -295,7 +345,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </span>
                 </div>
 
-                {reviewSubmitted ? (
+                {!userProfile ? (
+                  <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 text-center space-y-3">
+                    <div className="w-10 h-10 rounded-full bg-red-600/20 text-red-400 flex items-center justify-center mx-auto">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-bold text-white font-['Outfit'] uppercase">
+                        Rider Account Required
+                      </h4>
+                      <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
+                        To protect honest ratings and prevent spam, only registered riders with active accounts can submit verified reviews.
+                      </p>
+                    </div>
+                    {onOpenAuth && (
+                      <button
+                        type="button"
+                        onClick={onOpenAuth}
+                        className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md transition-colors"
+                      >
+                        <LogIn className="w-3.5 h-3.5" />
+                        <span>Sign In or Register to Review</span>
+                      </button>
+                    )}
+                  </div>
+                ) : reviewSubmitted ? (
                   <div className="p-4 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     <span>Maraming salamat! Your verified review has been posted successfully.</span>

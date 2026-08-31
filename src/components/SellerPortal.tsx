@@ -9,10 +9,12 @@ import {
   UploadCloud, 
   Smartphone, 
   ArrowRight, 
-  AlertCircle,
-  Image as ImageIcon,
-  Loader2,
-  Check
+  AlertCircle, 
+  Image as ImageIcon, 
+  Loader2, 
+  Check,
+  Lock,
+  LogIn
 } from 'lucide-react';
 import { Product, ProductCategory, UserProfile } from '../types';
 import { POPULAR_BIKES, DEMO_PRESET_ITEMS } from '../data/mockProducts';
@@ -98,6 +100,12 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
+    if (!userProfile) {
+      onOpenAuth();
+      setErrorMsg('Please sign in or register an account before posting products.');
+      return;
+    }
+
     if (!productName.trim()) {
       setErrorMsg('Please enter a listing title for the motorcycle part.');
       return;
@@ -166,6 +174,10 @@ export const SellerPortal: React.FC<SellerPortalProps> = ({
   };
 
   const handleDelete = async (id: string) => {
+    if (!userProfile) {
+      onOpenAuth();
+      return;
+    }
     try {
       await deleteProductFromDb(id);
     } catch (err) {
