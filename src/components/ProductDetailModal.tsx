@@ -337,7 +337,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   <div className="flex items-center gap-2">
                     <MessageSquare className="w-4 h-4 text-red-500" />
                     <h3 className="text-sm font-bold text-white font-['Outfit'] uppercase">
-                      Leave a Verified Product Review
+                      Write a Customer Review
                     </h3>
                   </div>
                   <span className="text-[11px] text-amber-400 font-semibold">
@@ -352,10 +352,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-xs font-bold text-white font-['Outfit'] uppercase">
-                        Rider Account Required
+                        Account Required to Review
                       </h4>
                       <p className="text-[11px] text-neutral-400 max-w-sm mx-auto">
-                        To protect honest ratings and prevent spam, only registered riders with active accounts can submit verified reviews.
+                        Sign in or register an account to leave a verified rating and share your feedback on this product with the community.
                       </p>
                     </div>
                     {onOpenAuth && (
@@ -372,7 +372,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ) : reviewSubmitted ? (
                   <div className="p-4 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span>Maraming salamat! Your verified review has been posted successfully.</span>
+                    <span>Maraming salamat! Your product review has been submitted and posted.</span>
                   </div>
                 ) : (
                   <form onSubmit={handleSubmitReview} className="space-y-3">
@@ -409,26 +409,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                          Your Name or Rider Alias:
+                          Your Name or Display Alias:
                         </label>
                         <input
                           type="text"
                           required
                           value={reviewerName}
                           onChange={(e) => setReviewerName(e.target.value)}
-                          placeholder="e.g., Kuya Dan (MotoVlog)"
+                          placeholder="e.g., Alex Santos or MotoFan"
                           className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
                         />
                       </div>
                       <div>
                         <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                          Motorcycle Installed On:
+                          Motorcycle / Bike Model (Optional):
                         </label>
                         <input
                           type="text"
                           value={reviewBike}
                           onChange={(e) => setReviewBike(e.target.value)}
-                          placeholder="e.g., Honda Click 125i V2 / Honda XRM 125"
+                          placeholder="e.g., Honda Click 125i, Yamaha Aerox, NMAX, etc."
                           className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg px-3 py-2 text-white focus:outline-none focus:border-red-500"
                         />
                       </div>
@@ -436,14 +436,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                     <div>
                       <label className="text-[11px] font-semibold text-neutral-400 block mb-1">
-                        Feedback & Performance Feedback (Tono / Hatak / Fitment):
+                        Review & Feedback:
                       </label>
                       <textarea
                         required
                         rows={2}
                         value={reviewComment}
                         onChange={(e) => setReviewComment(e.target.value)}
-                        placeholder="Tell other riders how this part performed on your ride (e.g. speed gain, build quality, sound)..."
+                        placeholder="Share your thoughts on build quality, fitment, performance, packaging, or installation..."
                         className="w-full bg-neutral-950 border border-neutral-800 text-xs rounded-lg p-3 text-white focus:outline-none focus:border-red-500"
                       />
                     </div>
@@ -453,7 +453,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       className="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
                     >
                       <Send className="w-3.5 h-3.5" />
-                      <span>Submit Star Rating & Review</span>
+                      <span>Submit Product Review</span>
                     </button>
                   </form>
                 )}
@@ -462,12 +462,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {/* Existing Reviews List */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                  Rider Feedback ({productReviews.length})
+                  Community & Customer Reviews ({productReviews.length})
                 </h4>
 
                 {productReviews.length === 0 ? (
                   <p className="text-xs text-neutral-500 italic">
-                    Be the first rider to review this part! Fill out the star rating above.
+                    Be the first customer to review this part! Fill out the star rating above.
                   </p>
                 ) : (
                   productReviews.map((rev) => (
@@ -481,7 +481,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                             <span className="text-xs font-bold text-white">{rev.userName}</span>
                             <div className="flex items-center gap-1 text-[10px] text-emerald-400">
                               <UserCheck className="w-3 h-3" />
-                              <span>Verified Rider • {rev.bikeModel}</span>
+                              <span>Verified User {rev.bikeModel ? `• ${rev.bikeModel}` : ''}</span>
                             </div>
                           </div>
                         </div>
